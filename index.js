@@ -50,51 +50,40 @@ if (settings.gitlab.projectID === null) {
     data = data.sort(function(a, b) {
       return a.id - b.id;
     });
-    github.issues.getAllMilestones({
-      user: settings.github.username,
-      repo: settings.github.repo
-    }, function(err, milestoneDataOpen) {
-      github.issues.getAllMilestones({
-        user: settings.github.username,
-        repo: settings.github.repo,
-        state: 'closed'
-      }, function(err, milestoneDataClosed) {
-        milestoneData = milestoneDataClosed.concat(milestoneDataOpen).map(function(item) {
-          return {
-            number: item.number,
-            title: item.title
-          };
-        });
-        milestoneDataMapped = milestoneData.map(function(item) {
-          return item.title;
-        });
+    getAllGHMilestones(function(milestoneDataA, milestoneDataMappedA) {
+      // for now use globals
+      milestoneData = milestoneDataA;
+      milestoneDataMapped = milestoneDataMappedA;
 
-        console.log('\n\n\n\n\n\n\n>>>>');
-        console.log(milestoneDataMapped);
-        console.log('\n\n\n\n\n\n\n');
-        console.log(milestoneDataClosed[0]);
-
-        console.log('\n\n\n\n\n\n\n');
-        async.each(data, function(item, cb) {
-          if (milestoneDataMapped.indexOf(item.title) < 0) {
-            console.log('Creating new Milestone', item.title);
-            createMilestone(item, function(err, createMilestoneData) {
-              console.log(createMilestoneData);
-              return cb(err);
-            });
-          } else {
+      console.log('\n\n\n\n\n\n\n>>>>');
+      console.log(milestoneDataMapped);
+      console.log('\n\n\n\n\n\n\n');
+      
+      async.each(data, function(item, cb) {
+        if (milestoneDataMapped.indexOf(item.title) < 0) {
+          console.log('Creating new Milestone', item.title);
+          createMilestone(item, function(err, createMilestoneData) {
+            console.log(createMilestoneData);
             return cb(err);
-          }
-        }, function(err) {
-          if (err) return console.log(err);
-          // all milestones are created
+          });
+        } else {
+          return cb(err);
+        }
+      }, function(err) {
+        if (err) return console.log(err);
+        // all milestones are created
+        getAllGHMilestones(function(milestoneDataA, milestoneDataMappedA) {
+          // for now use globals
+          milestoneData = milestoneDataA;
+          milestoneDataMapped = milestoneDataMappedA;
+
           createAllIssuesAndComments(milestoneData, function(err, data) {
             console.log('\n\n\n\nFinished creating all issues and Comments\n\n\n\n')
             console.log(err, data)
           });
-        }); // async
-      }); // closed Issues
-    }); // opend issues
+        });
+      }); // async
+    })
   }); // gitlab list milestones
 }
 
@@ -142,6 +131,32 @@ function createAllIssuesAndComments(milestoneData, callback) {
       }); // each series
     }); // getAllGHIssues
   }); // gitlab project Issues
+}
+
+function getAllGHMilestones(callback) {
+  github.issues.getAllMilestones({
+    user: settings.github.username,
+    repo: settings.github.repo
+  }, function(err, milestoneDataOpen) {
+    github.issues.getAllMilestones({
+      user: settings.github.username,
+      repo: settings.github.repo,
+      state: 'closed'
+    }, function(err, milestoneDataClosed) {
+      milestoneData = milestoneDataClosed.concat(milestoneDataOpen).map(function(item) {
+        return {
+          number: item.number,
+          title: item.title
+        };
+      });
+      milestoneDataMapped = milestoneData.map(function(item) {
+        return item.title;
+      });
+      return callback(milestoneData, milestoneDataMapped);
+
+    }); // openMilestones
+  }); //closedMilestones
+
 }
 
 function getAllGHIssues(callback) {
