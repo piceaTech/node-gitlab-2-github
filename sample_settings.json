@@ -1,0 +1,12 @@
+{
+  "gitlab": {
+    "url": "http://gitlab.mycompany.com/",
+    "token": "{{gitlab private token}}",
+    "projectID": null
+  },
+  "github": {
+    "username": "{{username}}",
+    "password": "{{password}}",
+    "repo": "{{repo}}"
+  }
+}
