@@ -30,7 +30,7 @@ if (settings.gitlab.projectID === null) {
     // required
     version: "3.0.0",
     // optional
-    debug: true,
+    //debug: true,
     protocol: "https",
     host: "api.github.com",
     pathPrefix: "",
@@ -44,12 +44,6 @@ if (settings.gitlab.projectID === null) {
     username: settings.github.username,
     password: settings.github.password
   });
-
-
-
-
-
-  // TODO check whether user has created all milestones on github
 
   gitlab.projects.milestones.list(settings.gitlab.projectID, function(data) {
     data = data.sort(function(a, b) {
@@ -80,69 +74,108 @@ if (settings.gitlab.projectID === null) {
             console.log('Creating new Milestone', item.title);
             createMilestone(item, function(err, createMilestoneData) {
               console.log(createMilestoneData);
-              cb(err);
+              return cb(err);
             });
           } else {
-            cb(err);
+            return cb(err);
           }
         }, function(err) {
           if (err) return console.log(err);
           // all milestones are created
-          createAllIssuesAndComments(milestoneData);
-
-
+          createAllIssuesAndComments(milestoneData, function(err, data){
+            console.log('\n\n\n\nFinished creating all issues and Comments\n\n\n\n')
+            console.log(err, data)
+          });
         }); // async
-
       }); // closed Issues
     }); // opend issues
   }); // gitlab list milestones
 }
 
 
-function createAllIssuesAndComments(milestoneData) {
+function createAllIssuesAndComments(milestoneData, callback) {
   // select all issues and comments from this project
   gitlab.projects.issues.list(settings.gitlab.projectID, function(issueData) {
+    // TODO return all issues via pagination
     // look whether issue is already created
-    console.log('length:', issueData.length)
-
-    // console.log('~', issueData);
-    async.eachSeries(issueData, function(item, cb) {
-      console.log(settings.github.username);
-      var props = {
-        user: settings.github.username,
-        repo: settings.github.repo,
-        title: item.title,
-        body: item.description
-      };
-      if(item.assignee && item.assignee.username == settings.github.username){
-        props.assignee = item.assignee.username;
-      }
-      if (item.milestone) {
-        var title = findMileStoneforTitle(milestoneData, item.milestone.title)
-        if (title !== null) {
-          props.milestone = title;
-        } else {
-          // don't import issues where milestone got deleted
-          return cb();
-        }
-      }
-      console.log('props:', props);
-      github.issues.create({
-        props
-      }, function(err, data) {
-        console.log('errData' , err, data);
-        if (!err) {
-          createAllIssueComments(settings.gitlab.projectID, item.id, data, cb);
-        } else {
-          cb(err);
-        }
-      });
-    }, function(err) {
-      console.log('error with issueData:', err);
+	issueData = issueData.sort(function(a, b) {
+      return a.id - b.id;
     });
-
-  })
+    console.log('length Issue GitLab:', issueData.length)
+    
+    
+    getAllGHIssues(function(err, ghIssues){
+      ghIssuesMapped = ghIssues.map(function(item){
+          return item.title;
+      });
+      console.log('length Issue GitLab:', ghIssues.length)
+      
+      
+      async.eachSeries(issueData, function(item, cb) {
+        if (ghIssuesMapped.indexOf(item.title) < 0) {
+          console.log('Creating new Issue', item.title);
+          createIssueAndComments(item, function(err, createIssueData) {
+            console.log(createIssueData);
+            return cb(err);
+          });
+        } else {
+          var ghIssue = ghIssues.filter(function(element, index, array){
+             return element.title == item.title;
+          });
+          return  makeCorrectState(ghIssue[0], item.state, cb);
+        }
+      }, function(err) {
+        if(err)console.log('error with issueData:', err);
+        callback(err);
+      }); // each series
+    });// getAllGHIssues
+  }); // gitlab project Issues
 }
+
+function getAllGHIssues(callback){
+  var lastItem = null;
+  var curPage = 1;
+  var allGhIssues = [];
+  async.whilst(function(){
+    return hasNext(lastItem)
+  }, function(cb){
+     github.issues.repoIssues({
+      user: settings.github.username,
+      repo: settings.github.repo,
+      state: 'all',
+      per_page: 100,
+      page: curPage
+    }, function(err, ghIssues){
+      console.log('got page', curPage, 'with', ghIssues.length, 'entries');
+      console.log('\n\n\n');
+      console.log(ghIssues.meta);
+      
+      curPage++;
+      lastItem = ghIssues;
+      var l = ghIssues.length;
+      for(var i = 0; i < l; i++){
+        allGhIssues[allGhIssues.length] = ghIssues[i];
+      }
+      cb(err);
+    });// gh repo Issues
+  }, function(err){
+    console.log('issue Count on GH:', allGhIssues.length)
+    callback(err, allGhIssues);
+  }); // async whilst
+}
+function hasNext(item){
+  if(item === null){
+    return true;
+  }
+  else if(item.meta.link == undefined || item.meta.link.indexOf('next') < 0){
+    return false
+  }
+  else{
+    return true
+  }
+  
+}
+
 
 function findMileStoneforTitle(milestoneData, title) {
   for (var i = milestoneData.length - 1; i >= 0; i--) {
@@ -153,28 +186,89 @@ function findMileStoneforTitle(milestoneData, title) {
   }
   return null;
 }
-
-function createAllIssueComments(projectID, issueID, newIssueData, cb) {
-  // get all comments add them to the comment
-  gitlab.issues.notes.all(projectID, issueID, function(data) {
-    if (data.length) {
-      for (var i = data.length - 1; i >= 0; i--) {
-
-        github.issues.createComment({
-          user: settings.github.username,
-          repo: settings.github.repo,
-          number: newIssueData.number,
-          body: data[i].body
-        }, cb)
-      }
+function createIssueAndComments(item, callback){
+  var props = {
+    user: settings.github.username,
+    repo: settings.github.repo,
+    title: item.title,
+    body: item.description
+  };
+  if(item.assignee && item.assignee.username == settings.github.username){ // TODO create Username mapping
+    props.assignee = item.assignee.username;
+  }
+  if (item.milestone) {
+    var title = findMileStoneforTitle(milestoneData, item.milestone.title)
+    if (title !== null) {
+      props.milestone = title;
+    } else {
+      
+      // TODO also import issues where milestone got deleted
+      // return callback();
     }
-  })
+  }
+  github.issues.create(props, function(err, newIssueData) {
+    if (!err) {
+      createAllIssueComments(settings.gitlab.projectID, item.id, newIssueData, function(err, issueData){
+        makeCorrectState(newIssueData, item.state, callback)
+      });
+    } else {
+      console.log('errData' , err, newIssueData);
+      return callback(err);
+    }
+  });
+}
+
+
+function makeCorrectState(ghIssueData, state, callback){
+  if(state != 'closed' || ghIssueData.state == 'closed'){
+    // standard is open so we don't have to update
+    return callback(null, ghIssueData);
+  }
+  
+  // TODO get props
+  var props = {
+    user: settings.github.username,
+    repo: settings.github.repo,
+    number: ghIssueData.number,
+    state: 'closed'
+  };
+ 
+  console.log('makeCorrectState', ghIssueData.number, state);
+  github.issues.edit(props, callback);
+}
+function createAllIssueComments(projectID, issueID, newIssueData, callback) {
+  // get all comments add them to the comment
+  gitlab.projects.issues.notes.all(projectID, issueID, function(data) {
+    if (data.length) {
+      data = data.sort(function(a, b) {
+        return a.id - b.id;
+      });
+      async.eachSeries(data, function(item, cb){
+        if((/Status changed to .*/.test(item.body) && !/Status changed to closed by commit.*/.test(item.body))
+          || /Milestone changed to.*/.test(item.body) || /Reassigned to /.test(item.body)){
+          // don't transport when the state changed (is a note in gitlab)
+          return cb();
+        }
+        else{
+          github.issues.createComment({
+            user: settings.github.username,
+            repo: settings.github.repo,
+            number: newIssueData.number,
+            body: item.body
+          }, cb);
+        }
+      }, callback)
+    }
+    else{
+      callback();
+    }
+  });
 }
 
 
 function createMilestone(data, cb) {
   github.issues.createMilestone({
-    username: settings.github.username,
+    user: settings.github.username,
     repo: settings.github.repo,
     title: data.title,
     description: data.description,
