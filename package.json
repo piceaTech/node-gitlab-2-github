@@ -1,6 +1,6 @@
 {
   "name": "gitlab-2-github",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Migrate Issues, Wiki from gitlab to github",
   "main": "index.js",
   "scripts": {
