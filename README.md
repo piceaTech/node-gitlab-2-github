@@ -8,7 +8,7 @@
 ## Usage
 1. `mv sample_settings.json settings.json`
 1. edit settings.json
-1. run `node transport`
+1. run `node index.js`
 
 
 ## Import limit
