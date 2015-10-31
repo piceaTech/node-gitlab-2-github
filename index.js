@@ -100,6 +100,11 @@ function createAllIssuesAndComments(milestoneData, callback) {
 
 
     getAllGHIssues(function(err, ghIssues) {
+      if(err){
+        console.log(err);
+        console.log('FAIL!');
+        exit(1);
+      }
       ghIssuesMapped = ghIssues.map(function(item) {
         return item.title;
       });
@@ -138,11 +143,21 @@ function getAllGHMilestones(callback) {
     user: settings.github.username,
     repo: settings.github.repo
   }, function(err, milestoneDataOpen) {
+    if(err){
+        console.log(err);
+        console.log('FAIL!');
+        exit(1);
+      }
     github.issues.getAllMilestones({
       user: settings.github.username,
       repo: settings.github.repo,
       state: 'closed'
     }, function(err, milestoneDataClosed) {
+      if(err){
+        console.log(err);
+        console.log('FAIL!');
+        exit(1);
+      }
       milestoneData = milestoneDataClosed.concat(milestoneDataOpen).map(function(item) {
         return {
           number: item.number,
