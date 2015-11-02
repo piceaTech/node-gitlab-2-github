@@ -45,7 +45,7 @@ if (settings.gitlab.projectID === null) {
     password: settings.github.password
   });
 
-  gitlab.projects.milestones.list(settings.gitlab.projectID, function(data) {
+  gitlab.projects.milestones.all(settings.gitlab.projectID, function(data) {
     console.log('Amount of gitlab milestones', data.length);
     data = data.sort(function(a, b) {
       return a.id - b.id;
