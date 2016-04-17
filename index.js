@@ -59,7 +59,7 @@ if (settings.gitlab.projectID === null) {
       console.log(milestoneDataMapped);
       console.log('\n\n\n\n\n\n\n');
       
-      async.each(data.title, function(item, cb) {
+      async.each(data, function(item, cb) {
         if (milestoneDataMapped.indexOf(item.title) < 0) {
           console.log('Creating new Milestone', item.title);
           createMilestone(item, function(err, createMilestoneData) {
@@ -67,7 +67,7 @@ if (settings.gitlab.projectID === null) {
             return cb(err);
           });
         } else {
-          return cb(err);
+          return cb(null);
         }
       }, function(err) {
         if (err) return console.log(err);
