@@ -73,15 +73,35 @@ if (settings.gitlab.projectID === null) {
         if (err) return console.log(err);
         // all milestones are created
         getAllGHMilestones(function(milestoneDataA, milestoneDataMappedA) {
-          // for now use globals
-          milestoneData = milestoneDataA;
-          milestoneDataMapped = milestoneDataMappedA;
+          // create labels
+          gitlab.projects.labels.all(settings.gitlab.projectID, null, function(glLabels) {
+            getAllGHLabelNames(function(ghlabelNames) {
+              async.each(glLabels, function(glLabel, cb) {
+                if (ghlabelNames.indexOf(glLabel.name) < 0) {
+                  console.log('Creating new Label', glLabel.name);
+                  createLabel(glLabel, function(err, createLabelData) {
+                    console.log(createLabelData);
+                    return cb(err);
+                  });
+                } else {
+                  return cb(null);
+                }
+              }, function(err) {
+                if (err) return console.log(err);
+                // all labels are created
 
-          createAllIssuesAndComments(milestoneData, function(err, data) {
-            console.log('\n\n\n\nFinished creating all issues and Comments\n\n\n\n')
-            console.log(err, data)
-          });
-        });
+                // for now use globals
+                milestoneData = milestoneDataA;
+                milestoneDataMapped = milestoneDataMappedA;
+
+                createAllIssuesAndComments(milestoneData, function(err, data) {
+                  console.log('\n\n\n\nFinished creating all issues and Comments\n\n\n\n')
+                  console.log(err, data)
+                });
+              }); //async
+            }); // getAllGHLabelNames
+          }); // gitlab list labels
+        }); // getAllGHMilestones
       }); // async
     })
   }); // gitlab list milestones
@@ -206,6 +226,26 @@ function getAllGHIssues(callback) {
   }); // async whilst
 }
 
+function getAllGHLabelNames(callback) {
+  github.issues.getLabels({
+    user: settings.github.username,
+    repo: settings.github.repo,
+    per_page: 100
+  }, function(err, labelData) {
+    if (err){
+        console.log(err);
+        console.log('FAIL!');
+        exit(1);
+    }
+    var labelNames = labelData.map(function(item) {
+      return item.name;
+    });
+
+    return callback(labelNames);
+  });
+
+}
+
 function hasNext(item) {
   if (item === null) {
     return true;
@@ -247,6 +287,9 @@ function createIssueAndComments(item, callback) {
       // TODO also import issues where milestone got deleted
       // return callback();
     }
+  }
+  if (item.labels) {
+    props.labels = item.labels;
   }
   console.log('props', props);
   github.issues.create(props, function(err, newIssueData) {
@@ -322,5 +365,14 @@ function createMilestone(data, cb) {
     description: data.description,
     state: (data.state === 'active') ? 'open' : 'closed',
     due_on: data.due_date + 'T00:00:00Z'
+  }, cb);
+}
+
+function createLabel(glLabel, cb) {
+  github.issues.createLabel({
+    user: settings.github.username,
+    repo: settings.github.repo,
+    name: glLabel.name,
+    color: glLabel.color.substr(1) // remove leading "#" because gitlab returns it but github wants the color without it
   }, cb);
 }
