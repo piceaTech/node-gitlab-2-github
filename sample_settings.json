@@ -5,6 +5,8 @@
     "projectID": null
   },
   "github": {
+    "url": "api.github.com",
+    "pathPrefix": "",
     "username": "{{username}}",
     "password": "{{password}}",
     "repo": "{{repo}}"
