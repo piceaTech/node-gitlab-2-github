@@ -32,8 +32,8 @@ if (settings.gitlab.projectID === null) {
     // optional
     //debug: true,
     protocol: "https",
-    host: "api.github.com",
-    pathPrefix: "",
+    host: settings.github.url,
+    pathPrefix: settings.github.pathPrefix,
     timeout: 5000,
     headers: {
       "user-agent": "node-gitlab-2-github" // GitHub is happy with a unique user agent
