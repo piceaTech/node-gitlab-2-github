@@ -269,14 +269,22 @@ function findMileStoneforTitle(milestoneData, title) {
 }
 
 function createIssueAndComments(item, callback) {
-  var props = {
-    user: settings.github.username,
-    repo: settings.github.repo,
-    title: item.title.trim(),
-    body: item.description
-  };
-  if (item.assignee && item.assignee.username == settings.github.username) { // TODO create Username mapping
-    props.assignee = item.assignee.username;
+  var props = null;
+  convertIssuesAndComments(item.description, item, function(bodyConverted) {
+    props = {
+      user: settings.github.username,
+      repo: settings.github.repo,
+      title: item.title.trim(),
+      body: bodyConverted
+    };
+  });
+  if (item.assignee) {
+    if (item.assignee.username == settings.github.username) {
+      props.assignee = item.assignee.username;
+    } else if (settings.usermap && settings.usermap[item.assignee.username]) {
+      // get github username name from config
+      props.assignee = settings.usermap[item.assignee.username];
+    }
   }
   if (item.milestone) {
     var title = findMileStoneforTitle(milestoneData, item.milestone.title)
@@ -342,12 +350,14 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
           // don't transport when the state changed (is a note in gitlab)
           return cb();
         } else {
-          github.issues.createComment({
-            user: settings.github.username,
-            repo: settings.github.repo,
-            number: newIssueData.number,
-            body: item.body
-          }, cb);
+          convertIssuesAndComments(item.body, item, function(bodyConverted) {
+            github.issues.createComment({
+              user: settings.github.username,
+              repo: settings.github.repo,
+              number: newIssueData.number,
+              body: bodyConverted
+            }, cb);
+        });
         }
       }, callback)
     } else {
@@ -375,4 +385,31 @@ function createLabel(glLabel, cb) {
     name: glLabel.name,
     color: glLabel.color.substr(1) // remove leading "#" because gitlab returns it but github wants the color without it
   }, cb);
+}
+
+/**
+ * Converts issue body and issue comments from gitlab to github. That means:
+ * - Add a line at the beginning indicating which original user created the
+ *   issue or the comment and when - because the github API creates everything
+ *   as the API user
+ * - Change username from gitlab to github in "mentions" (@username)
+ */
+function convertIssuesAndComments(str, item, cb){
+  if (settings.usermap == null || Object.keys(settings.usermap).length == 0) {
+    addMigrationLine(str, item, cb);
+  } else {
+    // settings.usermap contains the the usernames without the "@" but
+    // we want to match and replace with the "@" prefix
+    var re = new RegExp("@" + Object.keys(settings.usermap).join("|@"),"g");
+    
+    addMigrationLine(str, item, function(strWithMigLine) {
+      cb(strWithMigLine.replace(re, function(matched) {
+        return "@" + settings.usermap[matched.substr(1)];
+      }));
+    });
+  }
+}
+
+function addMigrationLine(str, item, cb) {
+  cb("In gitlab by @" +item.author.username+ " on " +item.created_at+ "\n\n" +str);
 }
