@@ -10,6 +10,8 @@ var gitlab = Gitlab({
   token: settings.gitlab.token
 });
 
+var userProjectRe = generateUserProjectRe();
+
 if (settings.gitlab.projectID === null) {
   gitlab.projects.all(function(projects) {
     projects = projects.sort(function(a, b) {
@@ -88,7 +90,14 @@ if (settings.gitlab.projectID === null) {
                 }
               }, function(err) {
                 if (err) return console.log(err);
-                // all labels are created
+                // all labels are created, create a hasAttachment label for manual attachment migration
+                var glLabel = {
+                  name: 'hasAttachment',
+                  color: '#fbca04'
+                }
+                createLabel(glLabel, function(err, createLabelData) {
+                  console.log(createLabelData);
+                });
 
                 // for now use globals
                 milestoneData = milestoneDataA;
@@ -298,6 +307,11 @@ function createIssueAndComments(item, callback) {
   }
   if (item.labels) {
     props.labels = item.labels;
+
+    // add hasAttachment label if body contains an attachment for manual migration
+    if (props.body && props.body.indexOf('/uploads/') > -1) {
+      props.labels.push('hasAttachment');
+    }
   }
   console.log('props', props);
   github.issues.create(props, function(err, newIssueData) {
@@ -346,7 +360,10 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
         return a.id - b.id;
       });
       async.eachSeries(data, function(item, cb) {
-        if ((/Status changed to .*/.test(item.body) && !/Status changed to closed by commit.*/.test(item.body)) || /Milestone changed to.*/.test(item.body) || /Reassigned to /.test(item.body)) {
+        if ((/Status changed to .*/.test(item.body) && !/Status changed to closed by commit.*/.test(item.body)) || 
+            /Milestone changed to.*/.test(item.body) || 
+            /Reassigned to /.test(item.body) || 
+            /Added .* label/.test(item.body)) {
           // don't transport when the state changed (is a note in gitlab)
           return cb();
         } else {
@@ -395,21 +412,65 @@ function createLabel(glLabel, cb) {
  * - Change username from gitlab to github in "mentions" (@username)
  */
 function convertIssuesAndComments(str, item, cb){
-  if (settings.usermap == null || Object.keys(settings.usermap).length == 0) {
+  if ( (settings.usermap == null || Object.keys(settings.usermap).length == 0) && 
+        (settings.projectmap == null || Object.keys(settings.projectmap).length == 0)) {
     addMigrationLine(str, item, cb);
   } else {
-    // settings.usermap contains the the usernames without the "@" but
-    // we want to match and replace with the "@" prefix
-    var re = new RegExp("@" + Object.keys(settings.usermap).join("|@"),"g");
-    
+    // - Replace userids as defined in settings.usermap.
+    //   They all start with '@' in the issues but we have them without in usermap
+    // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
+    //   They all have a '#' right after the project name in the issues but we have them without in projectmap
     addMigrationLine(str, item, function(strWithMigLine) {
-      cb(strWithMigLine.replace(re, function(matched) {
-        return "@" + settings.usermap[matched.substr(1)];
+      cb(strWithMigLine.replace(userProjectRe, function(matched) {
+        if (matched.startsWith('@')) {
+          // this is a userid
+          return '@' + settings.usermap[matched.substr(1)];
+        } else if (matched.endsWith('#')) {
+          // this is a cross-project issue reference
+          return settings.projectmap[matched.substring(0, matched.length-1)] + '#';
+        } else {
+          // something went wrong, do nothing
+          return matched;
+        }
       }));
     });
   }
 }
 
 function addMigrationLine(str, item, cb) {
-  cb("In gitlab by @" +item.author.username+ " on " +item.created_at+ "\n\n" +str);
+  var dateformatOptions = {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false
+  }
+  
+  var formattedDate = '';
+  
+  if (item.created_at) {
+    formattedDate = new Date(item.created_at).toLocaleString('en-US', dateformatOptions);
+  }
+  
+  cb("In gitlab by @" +item.author.username+ " on " +formattedDate+ "\n\n" +str);
+}
+
+/**
+ * Generate regular expression which finds userid and cross-project issue references
+ * from usermap and projectmap
+ */
+function generateUserProjectRe() {
+  var reString = '';
+  if (settings.usermap != null && Object.keys(settings.usermap).length > 0) {
+    reString = '@' + Object.keys(settings.usermap).join('|@');
+  }
+  if (settings.projectmap != null && Object.keys(settings.projectmap).length > 0) {
+    if (reString.length > 0) {
+      reString += '|';
+    }
+    reString += Object.keys(settings.projectmap).join('#|') + '#';
+  }
+  
+  return new RegExp(reString,'g');
 }
