@@ -46,7 +46,7 @@ if (settings.gitlab.projectID === null) {
     username: settings.github.username,
     password: settings.github.password
   });
-
+  
   gitlab.projects.milestones.all(settings.gitlab.projectID, function(data) {
     console.log('Amount of gitlab milestones', data.length);
     data = data.sort(function(a, b) {
@@ -104,8 +104,8 @@ if (settings.gitlab.projectID === null) {
                 milestoneDataMapped = milestoneDataMappedA;
 
                 createAllIssuesAndComments(milestoneData, function(err, data) {
-                  console.log('\n\n\n\nFinished creating all issues and Comments\n\n\n\n')
-                  console.log(err, data)
+                  console.log('\n\n\n\nFinished creating all issues and Comments\n\n\n\n');
+                  console.log(err, data);
                 });
               }); //async
             }); // getAllGHLabelNames
@@ -125,8 +125,22 @@ function createAllIssuesAndComments(milestoneData, callback) {
     issueData = issueData.sort(function(a, b) {
       return a.id - b.id;
     });
-    console.log('length Issue GitLab:', issueData.length)
-
+    console.log('length Issue GitLab:', issueData.length);
+    
+    // loop through all issues and add placeholder issues if there are gaps
+    // this is to ensure issue id's are the same in gitlab and GitHub
+    var placeHolderItem = {
+      title: 'Place holder issue for issue which does not exist probably deleted in Gitlab',
+      description: 'This is to ensure the issue ids in Gitlab and GitHub are the same',
+      state: 'closed'
+    }
+    for (var iIssue = 0; iIssue < issueData.length; iIssue++) {
+      if (issueData[iIssue].iid != iIssue + 1) {
+        issueData.splice(iIssue, 0, placeHolderItem);
+        iIssue++;
+        console.log('Added placeholder item for missing issue with id:', iIssue + 1);
+      }
+    }
 
     getAllGHIssues(function(err, ghIssues) {
       if(err){
@@ -137,8 +151,7 @@ function createAllIssuesAndComments(milestoneData, callback) {
       ghIssuesMapped = ghIssues.map(function(item) {
         return item.title;
       });
-      console.log('length Issue GitLab:', ghIssues.length)
-
+      console.log('length Issue GitHub:', ghIssues.length);
 
       async.eachSeries(issueData, function(item, cb) {
         if (item.milestone) {
@@ -317,7 +330,7 @@ function createIssueAndComments(item, callback) {
   github.issues.create(props, function(err, newIssueData) {
     if (!err) {
       createAllIssueComments(settings.gitlab.projectID, item.id, newIssueData, function(err, issueData) {
-        makeCorrectState(newIssueData, item, callback)
+        makeCorrectState(newIssueData, item, callback);
       });
     } else {
       console.log('errData', err, newIssueData);
@@ -341,7 +354,7 @@ function makeCorrectState(ghIssueData, item, callback) {
     state: 'closed',
   };
   if (item.milestone) {
-    var title = findMileStoneforTitle(milestoneData, item.milestone.title)
+    var title = findMileStoneforTitle(milestoneData, item.milestone.title);
     if (title !== null) {
       props.milestone = title;
     }
@@ -353,6 +366,9 @@ function makeCorrectState(ghIssueData, item, callback) {
 }
 
 function createAllIssueComments(projectID, issueID, newIssueData, callback) {
+  if (issueID == null) {
+    return callback();
+  }
   // get all comments add them to the comment
   gitlab.projects.issues.notes.all(projectID, issueID, function(data) {
     if (data.length) {
@@ -438,6 +454,11 @@ function convertIssuesAndComments(str, item, cb){
 }
 
 function addMigrationLine(str, item, cb) {
+  
+  if (item == null || item.author == null || item.author.username == null || item.created_at == null) {
+    return cb(str);
+  }
+  
   var dateformatOptions = {
     month: 'short',
     day: 'numeric',
@@ -447,13 +468,9 @@ function addMigrationLine(str, item, cb) {
     hour12: false
   }
   
-  var formattedDate = '';
+  var formattedDate = new Date(item.created_at).toLocaleString('en-US', dateformatOptions);
   
-  if (item.created_at) {
-    formattedDate = new Date(item.created_at).toLocaleString('en-US', dateformatOptions);
-  }
-  
-  cb("In gitlab by @" +item.author.username+ " on " +formattedDate+ "\n\n" +str);
+  return cb("In gitlab by @" +item.author.username+ " on " +formattedDate+ "\n\n" +str);
 }
 
 /**
