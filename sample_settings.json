@@ -7,6 +7,7 @@
   "github": {
     "url": "api.github.com",
     "pathPrefix": "",
+    "owner": "{{repository owner (user or organization)}}",
     "username": "{{username}}",
     "password": "{{password}}",
     "repo": "{{repo}}"
