@@ -182,7 +182,7 @@ function createAllIssuesAndComments(milestoneData, callback) {
 
 function getAllGHMilestones(callback) {
   github.issues.getAllMilestones({
-    user: settings.github.username,
+    user: settings.github.owner,
     repo: settings.github.repo
   }, function(err, milestoneDataOpen) {
     if(err){
@@ -191,7 +191,7 @@ function getAllGHMilestones(callback) {
         exit(1);
       }
     github.issues.getAllMilestones({
-      user: settings.github.username,
+      user: settings.github.owner,
       repo: settings.github.repo,
       state: 'closed'
     }, function(err, milestoneDataClosed) {
@@ -224,7 +224,7 @@ function getAllGHIssues(callback) {
     return hasNext(lastItem)
   }, function(cb) {
     github.issues.repoIssues({
-      user: settings.github.username,
+      user: settings.github.owner,
       repo: settings.github.repo,
       state: 'all',
       per_page: 100,
@@ -250,7 +250,7 @@ function getAllGHIssues(callback) {
 
 function getAllGHLabelNames(callback) {
   github.issues.getLabels({
-    user: settings.github.username,
+    user: settings.github.owner,
     repo: settings.github.repo,
     per_page: 100
   }, function(err, labelData) {
@@ -294,7 +294,7 @@ function createIssueAndComments(item, callback) {
   var props = null;
   convertIssuesAndComments(item.description, item, function(bodyConverted) {
     props = {
-      user: settings.github.username,
+      user: settings.github.owner,
       repo: settings.github.repo,
       title: item.title.trim(),
       body: bodyConverted
@@ -348,7 +348,7 @@ function makeCorrectState(ghIssueData, item, callback) {
 
   // TODO get props
   var props = {
-    user: settings.github.username,
+    user: settings.github.owner,
     repo: settings.github.repo,
     number: ghIssueData.number,
     state: 'closed',
@@ -385,7 +385,7 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
         } else {
           convertIssuesAndComments(item.body, item, function(bodyConverted) {
             github.issues.createComment({
-              user: settings.github.username,
+              user: settings.github.owner,
               repo: settings.github.repo,
               number: newIssueData.number,
               body: bodyConverted
@@ -402,7 +402,7 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
 
 function createMilestone(data, cb) {
   github.issues.createMilestone({
-    user: settings.github.username,
+    user: settings.github.owner,
     repo: settings.github.repo,
     title: data.title,
     description: data.description,
@@ -413,7 +413,7 @@ function createMilestone(data, cb) {
 
 function createLabel(glLabel, cb) {
   github.issues.createLabel({
-    user: settings.github.username,
+    user: settings.github.owner,
     repo: settings.github.repo,
     name: glLabel.name,
     color: glLabel.color.substr(1) // remove leading "#" because gitlab returns it but github wants the color without it
