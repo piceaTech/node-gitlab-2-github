@@ -2,8 +2,29 @@ var GitHubApi = require("github");
 var Gitlab = require('gitlab');
 var async = require('async');
 
-var settings = require('./settings.json');
+try{
+  var settings = require('./settings.json');  
+}
+catch(e){
+  if(e.code === 'MODULE_NOT_FOUND'){
+    console.log('\n\nPlease copy the sample_settings.json to settings.json.');
+  }
+  else{
+
+  }
+}
+
 console.log(settings);
+
+
+if(settings.gitlab.url === "http://gitlab.mycompany.com/"){
+  console.log('\n\nYou have to enter your gitlab url in the settings.json file.');
+  process.exit(1);
+}
+if(settings.gitlab.toke === "{{gitlab private token}}"){
+  console.log('\n\nYou have to enter your gitlab private token in the settings.json file.');
+  process.exit(1);
+}
 
 var gitlab = Gitlab({
   url: settings.gitlab.url,
