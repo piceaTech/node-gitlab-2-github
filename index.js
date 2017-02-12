@@ -167,7 +167,7 @@ function createAllIssuesAndComments(milestoneData, callback) {
       if(err){
         console.log(err);
         console.log('FAIL!');
-        exit(1);
+        process.exit(1);
       }
       ghIssuesMapped = ghIssues.map(function(item) {
         return item.title;
@@ -209,7 +209,7 @@ function getAllGHMilestones(callback) {
     if(err){
         console.log(err);
         console.log('FAIL!');
-        exit(1);
+        process.exit(1);
       }
     github.issues.getAllMilestones({
       user: settings.github.owner,
@@ -219,7 +219,7 @@ function getAllGHMilestones(callback) {
       if(err){
         console.log(err);
         console.log('FAIL!');
-        exit(1);
+        process.exit(1);
       }
       milestoneData = milestoneDataClosed.concat(milestoneDataOpen).map(function(item) {
         return {
@@ -278,7 +278,7 @@ function getAllGHLabelNames(callback) {
     if (err){
         console.log(err);
         console.log('FAIL!');
-        exit(1);
+        process.exit(1);
     }
     var labelNames = labelData.map(function(item) {
       return item.name;
