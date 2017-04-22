@@ -7,9 +7,11 @@
 1. `npm i`
 
 ## Usage
+
+Before using this script "copy" your gitlab repo with all the branches over to github. For this create a new repo with the infos (github.owner and github.repo) from the settings.json and push all the branches you need in the new repo. (Then will the autolinking of issues to commits work.)
+
 1. `mv sample_settings.json settings.json`
 1. edit settings.json
-1. create repo on github with the infos (github.owner and github.repo) from the settings.json
 1. run `node index.js`
 
 
