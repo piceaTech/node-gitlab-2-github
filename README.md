@@ -9,6 +9,7 @@
 ## Usage
 1. `mv sample_settings.json settings.json`
 1. edit settings.json
+1. create repo on github with the infos (github.owner and github.repo) from the settings.json
 1. run `node index.js`
 
 
