@@ -15,6 +15,7 @@ catch(e){
 }
 
 console.log(settings);
+console.log('\n\n\n');
 
 
 if(settings.gitlab.url === "http://gitlab.mycompany.com/"){
@@ -166,6 +167,7 @@ function createAllIssuesAndComments(milestoneData, callback) {
     getAllGHIssues(function(err, ghIssues) {
       if(err){
         console.log(err);
+        console.log('getAllGHIssues');
         console.log('FAIL!');
         process.exit(1);
       }
@@ -208,6 +210,7 @@ function getAllGHMilestones(callback) {
   }, function(err, milestoneDataOpen) {
     if(err){
         console.log(err);
+        console.log('getAllGHMilestones1');
         console.log('FAIL!');
         process.exit(1);
       }
@@ -218,6 +221,7 @@ function getAllGHMilestones(callback) {
     }, function(err, milestoneDataClosed) {
       if(err){
         console.log(err);
+        console.log('getAllGHMilestones2');
         console.log('FAIL!');
         process.exit(1);
       }
@@ -277,6 +281,7 @@ function getAllGHLabelNames(callback) {
   }, function(err, labelData) {
     if (err){
         console.log(err);
+        console.log('getAllGHLabelNames');
         console.log('FAIL!');
         process.exit(1);
     }
