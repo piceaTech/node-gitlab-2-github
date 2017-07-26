@@ -54,11 +54,12 @@ if (settings.gitlab.projectID === null) {
     // required
     version: "3.0.0",
     // optional
-    //debug: true,
+    debug: false,
     protocol: "https",
     host: settings.github.url,
     pathPrefix: settings.github.pathPrefix,
     timeout: 5000,
+    followRedirects: true,
     headers: {
       "user-agent": "node-gitlab-2-github" // GitHub is happy with a unique user agent
     }
@@ -204,7 +205,7 @@ function createAllIssuesAndComments(milestoneData, callback) {
 }
 
 function getAllGHMilestones(callback) {
-  github.issues.getAllMilestones({
+  github.issues.getMilestones({
     user: settings.github.owner,
     repo: settings.github.repo
   }, function(err, milestoneDataOpen) {
@@ -214,7 +215,7 @@ function getAllGHMilestones(callback) {
         console.log('FAIL!');
         process.exit(1);
       }
-    github.issues.getAllMilestones({
+    github.issues.getMilestones({
       user: settings.github.owner,
       repo: settings.github.repo,
       state: 'closed'
@@ -248,7 +249,7 @@ function getAllGHIssues(callback) {
   async.whilst(function() {
     return hasNext(lastItem)
   }, function(cb) {
-    github.issues.repoIssues({
+    github.issues.getForRepo({
       user: settings.github.owner,
       repo: settings.github.repo,
       state: 'all',
