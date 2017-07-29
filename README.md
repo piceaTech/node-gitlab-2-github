@@ -65,4 +65,11 @@ Because Github has a limit of 5000 Api requests per hour one has to watch out th
 
 So the rule of thumb should be that one can import a repo with ~ 2500 issues without a problem.
 
+## Bugs
 
+the milestone refs and issue refs do not seem to be rewritten properly at the
+moment. specifically, milestones show up like `%4` in comments
+and issue refs like `#42` do not remap to the `#42` from gitlab under the new
+issue number in github. @ references are remapped properly (yay). If this is a
+deal breaker, a large amount of the code to do this has been written it just
+appears to no longer work in current form :(
