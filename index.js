@@ -3,7 +3,7 @@ var Gitlab = require('gitlab');
 var async = require('async');
 
 try{
-  var settings = require('./settings.json');  
+  var settings = require('./settings.json');
 }
 catch(e){
   if(e.code === 'MODULE_NOT_FOUND'){
@@ -22,7 +22,7 @@ if(settings.gitlab.url === "http://gitlab.mycompany.com/"){
   console.log('\n\nYou have to enter your gitlab url in the settings.json file.');
   process.exit(1);
 }
-if(settings.gitlab.toke === "{{gitlab private token}}"){
+if(settings.gitlab.token === "{{gitlab private token}}"){
   console.log('\n\nYou have to enter your gitlab private token in the settings.json file.');
   process.exit(1);
 }
@@ -69,7 +69,7 @@ if (settings.gitlab.projectID === null) {
     username: settings.github.username,
     password: settings.github.password
   });
-  
+
   gitlab.projects.milestones.all(settings.gitlab.projectID, function(data) {
     console.log('Amount of gitlab milestones', data.length);
     data = data.sort(function(a, b) {
@@ -83,7 +83,7 @@ if (settings.gitlab.projectID === null) {
       console.log('\n\n\n\n\n\n\n>>>>');
       console.log(milestoneDataMapped);
       console.log('\n\n\n\n\n\n\n');
-      
+
       async.each(data, function(item, cb) {
         if (milestoneDataMapped.indexOf(item.title) < 0) {
           console.log('Creating new Milestone', item.title);
@@ -149,7 +149,7 @@ function createAllIssuesAndComments(milestoneData, callback) {
       return a.id - b.id;
     });
     console.log('length Issue GitLab:', issueData.length);
-    
+
     // loop through all issues and add placeholder issues if there are gaps
     // this is to ensure issue id's are the same in gitlab and GitHub
     var placeHolderItem = {
@@ -403,9 +403,9 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
         return a.id - b.id;
       });
       async.eachSeries(data, function(item, cb) {
-        if ((/Status changed to .*/.test(item.body) && !/Status changed to closed by commit.*/.test(item.body)) || 
-            /Milestone changed to.*/.test(item.body) || 
-            /Reassigned to /.test(item.body) || 
+        if ((/Status changed to .*/.test(item.body) && !/Status changed to closed by commit.*/.test(item.body)) ||
+            /Milestone changed to.*/.test(item.body) ||
+            /Reassigned to /.test(item.body) ||
             /Added .* label/.test(item.body)) {
           // don't transport when the state changed (is a note in gitlab)
           return cb();
@@ -455,7 +455,7 @@ function createLabel(glLabel, cb) {
  * - Change username from gitlab to github in "mentions" (@username)
  */
 function convertIssuesAndComments(str, item, cb){
-  if ( (settings.usermap == null || Object.keys(settings.usermap).length == 0) && 
+  if ( (settings.usermap == null || Object.keys(settings.usermap).length == 0) &&
         (settings.projectmap == null || Object.keys(settings.projectmap).length == 0)) {
     addMigrationLine(str, item, cb);
   } else {
@@ -481,11 +481,11 @@ function convertIssuesAndComments(str, item, cb){
 }
 
 function addMigrationLine(str, item, cb) {
-  
+
   if (item == null || item.author == null || item.author.username == null || item.created_at == null) {
     return cb(str);
   }
-  
+
   var dateformatOptions = {
     month: 'short',
     day: 'numeric',
@@ -494,9 +494,9 @@ function addMigrationLine(str, item, cb) {
     minute: 'numeric',
     hour12: false
   }
-  
+
   var formattedDate = new Date(item.created_at).toLocaleString('en-US', dateformatOptions);
-  
+
   return cb("In gitlab by @" +item.author.username+ " on " +formattedDate+ "\n\n" +str);
 }
 
@@ -515,6 +515,6 @@ function generateUserProjectRe() {
     }
     reString += Object.keys(settings.projectmap).join('#|') + '#';
   }
-  
+
   return new RegExp(reString,'g');
 }
