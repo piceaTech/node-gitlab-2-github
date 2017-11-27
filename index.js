@@ -51,9 +51,6 @@ if (settings.gitlab.projectID === null) {
 
 
   var github = new GitHubApi({
-    // required
-    version: "3.0.0",
-    // optional
     debug: false,
     protocol: "https",
     host: settings.github.url,
@@ -61,7 +58,8 @@ if (settings.gitlab.projectID === null) {
     timeout: 5000,
     followRedirects: true,
     headers: {
-      "user-agent": "node-gitlab-2-github" // GitHub is happy with a unique user agent
+      "user-agent": "node-gitlab-2-github",// GitHub is happy with a unique user agent
+      'accept': 'application/vnd.github.v3+json',
     }
   });
   github.authenticate({
@@ -206,27 +204,17 @@ function createAllIssuesAndComments(milestoneData, callback) {
 
 function getAllGHMilestones(callback) {
   github.issues.getMilestones({
-    user: settings.github.owner,
-    repo: settings.github.repo
-  }, function(err, milestoneDataOpen) {
+    owner: settings.github.owner,
+    repo: settings.github.repo,
+    state: 'all'
+  }, function(err, milestoneDataAll) {
     if(err){
         console.log(err);
         console.log('getAllGHMilestones1');
         console.log('FAIL!');
         process.exit(1);
       }
-    github.issues.getMilestones({
-      user: settings.github.owner,
-      repo: settings.github.repo,
-      state: 'closed'
-    }, function(err, milestoneDataClosed) {
-      if(err){
-        console.log(err);
-        console.log('getAllGHMilestones2');
-        console.log('FAIL!');
-        process.exit(1);
-      }
-      milestoneData = milestoneDataClosed.concat(milestoneDataOpen).map(function(item) {
+      milestoneData = milestoneDataAll.data.map(function(item) {
         return {
           number: item.number,
           title: item.title
@@ -237,8 +225,7 @@ function getAllGHMilestones(callback) {
       });
       return callback(milestoneData, milestoneDataMapped);
 
-    }); // openMilestones
-  }); //closedMilestones
+    }); // Milestones
 
 }
 
@@ -250,7 +237,7 @@ function getAllGHIssues(callback) {
     return hasNext(lastItem)
   }, function(cb) {
     github.issues.getForRepo({
-      user: settings.github.owner,
+      owner: settings.github.owner,
       repo: settings.github.repo,
       state: 'all',
       per_page: 100,
@@ -276,7 +263,7 @@ function getAllGHIssues(callback) {
 
 function getAllGHLabelNames(callback) {
   github.issues.getLabels({
-    user: settings.github.owner,
+    owner: settings.github.owner,
     repo: settings.github.repo,
     per_page: 100
   }, function(err, labelData) {
@@ -286,7 +273,7 @@ function getAllGHLabelNames(callback) {
         console.log('FAIL!');
         process.exit(1);
     }
-    var labelNames = labelData.map(function(item) {
+    var labelNames = labelData.data.map(function(item) {
       return item.name;
     });
 
@@ -321,7 +308,7 @@ function createIssueAndComments(item, callback) {
   var props = null;
   convertIssuesAndComments(item.description, item, function(bodyConverted) {
     props = {
-      user: settings.github.owner,
+      owner: settings.github.owner,
       repo: settings.github.repo,
       title: item.title.trim(),
       body: bodyConverted
@@ -356,8 +343,8 @@ function createIssueAndComments(item, callback) {
   console.log('props', props);
   github.issues.create(props, function(err, newIssueData) {
     if (!err) {
-      createAllIssueComments(settings.gitlab.projectID, item.id, newIssueData, function(err, issueData) {
-        makeCorrectState(newIssueData, item, callback);
+      createAllIssueComments(settings.gitlab.projectID, item.id, newIssueData.data, function(err, issueData) {
+        makeCorrectState(newIssueData.data, item, callback);
       });
     } else {
       console.log('errData', err, newIssueData);
@@ -375,7 +362,7 @@ function makeCorrectState(ghIssueData, item, callback) {
 
   // TODO get props
   var props = {
-    user: settings.github.owner,
+    owner: settings.github.owner,
     repo: settings.github.repo,
     number: ghIssueData.number,
     state: 'closed',
@@ -412,7 +399,7 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
         } else {
           convertIssuesAndComments(item.body, item, function(bodyConverted) {
             github.issues.createComment({
-              user: settings.github.owner,
+              owner: settings.github.owner,
               repo: settings.github.repo,
               number: newIssueData.number,
               body: bodyConverted
@@ -429,7 +416,7 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
 
 function createMilestone(data, cb) {
   github.issues.createMilestone({
-    user: settings.github.owner,
+    owner: settings.github.owner,
     repo: settings.github.repo,
     title: data.title,
     description: data.description,
@@ -440,7 +427,7 @@ function createMilestone(data, cb) {
 
 function createLabel(glLabel, cb) {
   github.issues.createLabel({
-    user: settings.github.owner,
+    owner: settings.github.owner,
     repo: settings.github.repo,
     name: glLabel.name,
     color: glLabel.color.substr(1) // remove leading "#" because gitlab returns it but github wants the color without it
