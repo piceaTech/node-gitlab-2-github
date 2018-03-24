@@ -1,5 +1,5 @@
-var GitHubApi = require("github");
-var Gitlab = require('gitlab');
+var GitHubApi = require('@octokit/rest')
+var Gitlab = require('node-gitlab-api');
 var async = require('async');
 
 try{
@@ -35,7 +35,8 @@ var gitlab = Gitlab({
 var userProjectRe = generateUserProjectRe();
 
 if (settings.gitlab.projectID === null) {
-  gitlab.projects.all(function(projects) {
+  gitlab.projects.all()
+  .then(function(projects) {
     projects = projects.sort(function(a, b) {
       return a.id - b.id;
     });
@@ -45,6 +46,9 @@ if (settings.gitlab.projectID === null) {
     console.log('\n\n');
     console.log('Select which project ID should be transported to github. Edit the settings.json accordingly. (gitlab.projectID)');
     console.log('\n\n');
+  }).catch(function(err){
+    console.log('An Error occured while fetching all projects:');
+    console.log(err);
   });
 } else {
   // user has choosen a project
@@ -68,7 +72,7 @@ if (settings.gitlab.projectID === null) {
     password: settings.github.password
   });
 
-  gitlab.projects.milestones.all(settings.gitlab.projectID, function(data) {
+  gitlab.projects.milestones.all(settings.gitlab.projectID).then(function(data) {
     console.log('Amount of gitlab milestones', data.length);
     data = data.sort(function(a, b) {
       return a.id - b.id;
@@ -97,7 +101,7 @@ if (settings.gitlab.projectID === null) {
         // all milestones are created
         getAllGHMilestones(function(milestoneDataA, milestoneDataMappedA) {
           // create labels
-          gitlab.projects.labels.all(settings.gitlab.projectID, null, function(glLabels) {
+          gitlab.projects.labels.all(settings.gitlab.projectID).then(function(glLabels) {
             getAllGHLabelNames(function(ghlabelNames) {
               async.each(glLabels, function(glLabel, cb) {
                 if (ghlabelNames.indexOf(glLabel.name) < 0) {
@@ -130,17 +134,23 @@ if (settings.gitlab.projectID === null) {
                 });
               }); //async
             }); // getAllGHLabelNames
+          }).catch(function(err){
+            console.log('An Error occured while loading all labels:');
+            console.log(err);
           }); // gitlab list labels
         }); // getAllGHMilestones
       }); // async
     })
+  }).catch(function(err){
+    console.log('An Error occured while loading all milestones:');
+    console.log(err);
   }); // gitlab list milestones
 }
 
 
 function createAllIssuesAndComments(milestoneData, callback) {
   // select all issues and comments from this project
-  gitlab.projects.issues.list(settings.gitlab.projectID, function(issueData) {
+  gitlab.projects.issues.list(settings.gitlab.projectID).then(function(issueData) {
     // TODO return all issues via pagination
     // look whether issue is already created
     issueData = issueData.sort(function(a, b) {
@@ -199,6 +209,9 @@ function createAllIssuesAndComments(milestoneData, callback) {
         callback(err);
       }); // each series
     }); // getAllGHIssues
+  }).catch(function(err){
+    console.log('An Error occured while fetching all issues:');
+    console.log(err);
   }); // gitlab project Issues
 }
 
@@ -384,7 +397,7 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
     return callback();
   }
   // get all comments add them to the comment
-  gitlab.projects.issues.notes.all(projectID, issueID, function(data) {
+  gitlab.projects.issues.notes.all(projectID, issueID).then(function(data) {
     if (data.length) {
       data = data.sort(function(a, b) {
         return a.id - b.id;
@@ -410,6 +423,9 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
     } else {
       callback();
     }
+  }).catch(function(err){
+    console.log(`An Error occured while fetching all notes for issue ${issueID}:`);
+    console.log(err);
   });
 }
 
