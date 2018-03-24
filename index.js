@@ -3,26 +3,26 @@ var Gitlab = require('node-gitlab-api');
 var async = require('async');
 
 try{
-  var settings = require('./settings.json');
+  var settings = require('./settings.js');
 }
 catch(e){
   if(e.code === 'MODULE_NOT_FOUND'){
     console.log('\n\nPlease copy the sample_settings.json to settings.json.');
+    process.exit(1);
   }
   else{
-
+    console.log(e);
+    process.exit(1);
   }
 }
 
-console.log(settings);
 console.log('\n\n\n');
 
-
-if(settings.gitlab.url === "http://gitlab.mycompany.com/"){
+if(!settings.gitlab.url || settings.gitlab.url === "http://gitlab.mycompany.com/"){
   console.log('\n\nYou have to enter your gitlab url in the settings.json file.');
   process.exit(1);
 }
-if(settings.gitlab.token === "{{gitlab private token}}"){
+if(!settings.gitlab.token || settings.gitlab.token === "{{gitlab private token}}"){
   console.log('\n\nYou have to enter your gitlab private token in the settings.json file.');
   process.exit(1);
 }
@@ -35,7 +35,7 @@ var gitlab = Gitlab({
 var userProjectRe = generateUserProjectRe();
 
 if (settings.gitlab.projectID === null) {
-  gitlab.projects.all()
+  gitlab.projects.all({membership:true})
   .then(function(projects) {
     projects = projects.sort(function(a, b) {
       return a.id - b.id;
@@ -56,11 +56,8 @@ if (settings.gitlab.projectID === null) {
 
   var github = new GitHubApi({
     debug: false,
-    protocol: "https",
-    host: settings.github.url,
-    pathPrefix: settings.github.pathPrefix,
+    baseUrl: (settings.github.baseUrl?settings.github.baseUrl:"https://api.github.com"),
     timeout: 5000,
-    followRedirects: true,
     headers: {
       "user-agent": "node-gitlab-2-github",// GitHub is happy with a unique user agent
       'accept': 'application/vnd.github.v3+json',
@@ -69,7 +66,7 @@ if (settings.gitlab.projectID === null) {
   github.authenticate({
     type: "basic",
     username: settings.github.username,
-    password: settings.github.password
+    password: settings.github.token
   });
 
   gitlab.projects.milestones.all(settings.gitlab.projectID).then(function(data) {
@@ -82,7 +79,7 @@ if (settings.gitlab.projectID === null) {
       milestoneData = milestoneDataA;
       milestoneDataMapped = milestoneDataMappedA;
 
-      console.log('\n\n\n\n\n\n\n>>>>');
+      console.log('\n\n\n\n\n\n\nMilestones>>>>');
       console.log(milestoneDataMapped);
       console.log('\n\n\n\n\n\n\n');
 
@@ -130,7 +127,7 @@ if (settings.gitlab.projectID === null) {
 
                 createAllIssuesAndComments(milestoneData, function(err, data) {
                   console.log('\n\n\n\nFinished creating all issues and Comments\n\n\n\n');
-                  console.log(err, data);
+                  console.log('err and data:', err, data);
                 });
               }); //async
             }); // getAllGHLabelNames
@@ -150,7 +147,7 @@ if (settings.gitlab.projectID === null) {
 
 function createAllIssuesAndComments(milestoneData, callback) {
   // select all issues and comments from this project
-  gitlab.projects.issues.list(settings.gitlab.projectID).then(function(issueData) {
+  gitlab.projects.issues.all(settings.gitlab.projectID).then(function(issueData) {
     // TODO return all issues via pagination
     // look whether issue is already created
     issueData = issueData.sort(function(a, b) {
@@ -256,15 +253,21 @@ function getAllGHIssues(callback) {
       per_page: 100,
       page: curPage
     }, function(err, ghIssues) {
-      console.log('got page', curPage, 'with', ghIssues.length, 'entries');
+      if(err){
+        console.log(err);
+        console.log('getAllGHIssues');
+        console.log('FAIL!');
+        process.exit(1);
+      }
+      console.log('got page', curPage, 'with', ghIssues.data.length, 'entries');
       console.log('\n\n\n');
       console.log('ghIssues.meta', ghIssues.meta);
 
       curPage++;
       lastItem = ghIssues;
-      var l = ghIssues.length;
+      var l = ghIssues.data.length;
       for (var i = 0; i < l; i++) {
-        allGhIssues[allGhIssues.length] = ghIssues[i];
+        allGhIssues[allGhIssues.length] = ghIssues.data[i];
       }
       cb(err);
     }); // gh repo Issues
@@ -356,7 +359,7 @@ function createIssueAndComments(item, callback) {
   console.log('props', props);
   github.issues.create(props, function(err, newIssueData) {
     if (!err) {
-      createAllIssueComments(settings.gitlab.projectID, item.id, newIssueData.data, function(err, issueData) {
+      createAllIssueComments(settings.gitlab.projectID, item.iid, newIssueData.data, function(err, issueData) {
         makeCorrectState(newIssueData.data, item, callback);
       });
     } else {
@@ -397,6 +400,7 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
     return callback();
   }
   // get all comments add them to the comment
+  console.log(`fetching all notes for issue ${issueID}`);
   gitlab.projects.issues.notes.all(projectID, issueID).then(function(data) {
     if (data.length) {
       data = data.sort(function(a, b) {
@@ -404,9 +408,10 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
       });
       async.eachSeries(data, function(item, cb) {
         if ((/Status changed to .*/.test(item.body) && !/Status changed to closed by commit.*/.test(item.body)) ||
-            /Milestone changed to.*/.test(item.body) ||
+            /changed milestone to .*/.test(item.body) ||
             /Reassigned to /.test(item.body) ||
-            /Added .* label/.test(item.body)) {
+            /added .* labels/.test(item.body) ||
+            /mentioned in issue.*/.test(item.body)) {
           // don't transport when the state changed (is a note in gitlab)
           return cb();
         } else {

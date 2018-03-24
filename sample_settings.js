@@ -1,15 +1,14 @@
-{
+module.exports = {
   "gitlab": {
-    "url": "http://gitlab.mycompany.com/",
+    "url": "http://gitlab.mycompany.com/", // probably: https://gitlab.com
     "token": "{{gitlab private token}}",
     "projectID": null
   },
   "github": {
-    "url": "api.github.com",
-    "pathPrefix": "",
+    // "baseUrl":"https://gitlab.mycompany.com:123/etc",
     "owner": "{{repository owner (user or organization)}}",
     "username": "{{username}}",
-    "password": "{{password}}",
+    "token": "{{token}}",
     "repo": "{{repo}}"
   },
   "usermap": {

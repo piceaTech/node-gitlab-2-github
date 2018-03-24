@@ -8,14 +8,14 @@
 
 ## Usage
 
-Before using this script "copy" your gitlab repo with all the branches over to github. For this create a new repo with the infos (github.owner and github.repo) from the settings.json and push all the branches you need in the new repo. (Then will the autolinking of issues to commits work.)
+Before using this script "copy" your gitlab repo with all the branches over to github. For this create a new repo with the infos (github.owner and github.repo) from the settings.js and push all the branches you need in the new repo. (Then will the autolinking of issues to commits work.) The user must be a member of the project you want to copy or else you won't see it in the first step.
 
-1. `mv sample_settings.json settings.json`
-1. edit settings.json
+1. `cp sample_settings.js settings.js`
+1. edit settings.js
 1. run `node index.js`
 
 
-## Where to find info for the settings.json
+## Where to find info for the `settings.js`
 
 
 ### gitlab
@@ -26,7 +26,7 @@ The URL under which your gitlab instance is hosted.
 
 #### gitlab.token
 
-Go to your settings. Open the account tab. The private Token is the token needed.
+Go to your settings. Open the Access Token tab. Create a new Access Token and copy that into the `settings.js`
 
 #### gitlab.projectID
 
@@ -36,7 +36,7 @@ Leave it null for the first run of the script. Then the script will show you whi
 
 #### github.url
 
-Where is the github instance hosted? Default is the official api.github.com domain
+Where is the github instance hosted? Default is the official `api.github.com` domain
 
 #### github.pathPrefix
 
