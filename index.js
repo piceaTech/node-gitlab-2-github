@@ -436,14 +436,17 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
 
 
 function createMilestone(data, cb) {
-  github.issues.createMilestone({
+  let item = {
     owner: settings.github.owner,
     repo: settings.github.repo,
     title: data.title,
     description: data.description,
-    state: (data.state === 'active') ? 'open' : 'closed',
-    due_on: data.due_date + 'T00:00:00Z'
-  }, cb);
+    state: (data.state === 'active') ? 'open' : 'closed'
+  };
+  if (data.due_date){
+    item.due_on = data.due_date + 'T00:00:00Z';
+  }
+  github.issues.createMilestone(item, cb);
 }
 
 function createLabel(glLabel, cb) {
