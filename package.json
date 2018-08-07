@@ -27,6 +27,6 @@
   "dependencies": {
     "@octokit/rest": "^15.2.5",
     "async": "^1.4.0",
-    "node-gitlab-api": "^2.2.6"
+    "gitlab": "^3.7.0"
   }
 }

@@ -1,79 +1,92 @@
 var GitHubApi = require('@octokit/rest')
-var Gitlab = require('node-gitlab-api');
+const Gitlab = require('gitlab').default
 var async = require('async');
 
-try{
+try {
   var settings = require('./settings.js');
-}
-catch(e){
-  if(e.code === 'MODULE_NOT_FOUND'){
+} catch(e) {
+  if (e.code === 'MODULE_NOT_FOUND') {
     console.log('\n\nPlease copy the sample_settings.json to settings.json.');
-    process.exit(1);
-  }
-  else{
+  } else {
     console.log(e);
-    process.exit(1);
   }
+  
+  process.exit(1);
 }
 
-console.log('\n\n\n');
-
-if(!settings.gitlab.url || settings.gitlab.url === "http://gitlab.mycompany.com/"){
+// Ensure that the GitLab URL and token has been set in settings.json
+if (!settings.gitlab.url || settings.gitlab.url === "http://gitlab.mycompany.com/") {
   console.log('\n\nYou have to enter your gitlab url in the settings.json file.');
   process.exit(1);
 }
-if(!settings.gitlab.token || settings.gitlab.token === "{{gitlab private token}}"){
+if (!settings.gitlab.token || settings.gitlab.token === "{{gitlab private token}}") {
   console.log('\n\nYou have to enter your gitlab private token in the settings.json file.');
   process.exit(1);
 }
 
-var gitlab = Gitlab({
+// Create a GitLab API object
+var gitlab = new Gitlab({
   url: settings.gitlab.url,
   token: settings.gitlab.token
 });
 
+// Create a GitHub API object
+var github = new GitHubApi({
+  debug: false,
+  baseUrl: (settings.github.baseUrl?settings.github.baseUrl:"https://api.github.com"),
+  timeout: 5000,
+  headers: {
+    'user-agent': 'node-gitlab-2-github', // GitHub is happy with a unique user agent
+    'accept': 'application/vnd.github.v3+json',
+  }
+});
+
+// regex for converting user from GitLab to GitHub
 var userProjectRe = generateUserProjectRe();
 
+// If no project id is given in settings.json, just return
+// all of the projects that this user is associated with.
 if (settings.gitlab.projectID === null) {
-  gitlab.projects.all({membership:true})
-  .then(function(projects) {
-    projects = projects.sort(function(a, b) {
-      return a.id - b.id;
-    });
-    for (var i = 0; i < projects.length; i++) {
-      console.log('projects:', projects[i].id, projects[i].description, projects[i].name);
+  listProjects();
+} else {
+  // user has choosen a project
+  migrate();
+}
+
+// ----------------------------------------------------------------------------
+
+function listProjects() {
+  gitlab.Projects.all({membership: true}).then(function(projects) {
+    // sort projects by increasing ProjectID
+    projects = projects.sort(function(a, b) { return a.id - b.id; });
+
+    // print each project with info
+    for (let i = 0; i < projects.length; i++) {
+      console.log(projects[i].id.toString(), '\t', projects[i].name, '\t--\t', projects[i].description);
     }
+
+    // instructions for user
     console.log('\n\n');
     console.log('Select which project ID should be transported to github. Edit the settings.json accordingly. (gitlab.projectID)');
     console.log('\n\n');
+
   }).catch(function(err){
     console.log('An Error occured while fetching all projects:');
     console.log(err);
   });
-} else {
-  // user has choosen a project
+}
 
+function migrate() {
 
-  var github = new GitHubApi({
-    debug: false,
-    baseUrl: (settings.github.baseUrl?settings.github.baseUrl:"https://api.github.com"),
-    timeout: 5000,
-    headers: {
-      "user-agent": "node-gitlab-2-github",// GitHub is happy with a unique user agent
-      'accept': 'application/vnd.github.v3+json',
-    }
-  });
   github.authenticate({
     type: "basic",
     username: settings.github.username,
     password: settings.github.token
   });
 
-  gitlab.projects.milestones.all(settings.gitlab.projectID).then(function(data) {
+  gitlab.ProjectMilestones.all(settings.gitlab.projectID).then(function(data) {
     console.log('Amount of gitlab milestones', data.length);
-    data = data.sort(function(a, b) {
-      return a.id - b.id;
-    });
+    data = data.sort(function(a, b) { return a.id - b.id; });
     getAllGHMilestones(function(milestoneDataA, milestoneDataMappedA) {
       // for now use globals
       milestoneData = milestoneDataA;
@@ -98,7 +111,7 @@ if (settings.gitlab.projectID === null) {
         // all milestones are created
         getAllGHMilestones(function(milestoneDataA, milestoneDataMappedA) {
           // create labels
-          gitlab.projects.labels.all(settings.gitlab.projectID).then(function(glLabels) {
+          gitlab.Labels.all(settings.gitlab.projectID).then(function(glLabels) {
             getAllGHLabelNames(function(ghlabelNames) {
               async.each(glLabels, function(glLabel, cb) {
                 if (ghlabelNames.indexOf(glLabel.name) < 0) {
@@ -111,7 +124,7 @@ if (settings.gitlab.projectID === null) {
                   return cb(null);
                 }
               }, function(err) {
-                if (err) return console.log(err);
+                // if (err) return console.log(err);
                 // all labels are created, create a hasAttachment label for manual attachment migration
                 var glLabel = {
                   name: 'hasAttachment',
@@ -147,7 +160,7 @@ if (settings.gitlab.projectID === null) {
 
 function createAllIssuesAndComments(milestoneData, callback) {
   // select all issues and comments from this project
-  gitlab.projects.issues.all(settings.gitlab.projectID).then(function(issueData) {
+  gitlab.Issues.all({projectId: settings.gitlab.projectID}).then(function(issueData) {
     // TODO return all issues via pagination
     // look whether issue is already created
     issueData = issueData.sort(function(a, b) {
@@ -401,7 +414,7 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
   }
   // get all comments add them to the comment
   console.log(`fetching all notes for issue ${issueID}`);
-  gitlab.projects.issues.notes.all(projectID, issueID).then(function(data) {
+  gitlab.IssueNotes.all(projectID, issueID).then(function(data) {
     if (data.length) {
       data = data.sort(function(a, b) {
         return a.id - b.id;

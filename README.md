@@ -7,9 +7,34 @@
 1. `cd node-gitlab-2-github`
 1. `npm i`
 
+## Preliminaries
+
+Before using this script, you must mirror your GitLab repo to your new GitHub repo. This can be done with the following steps:
+
+```bash
+# Clone the repo from GitLab using the `--mirror` option. This is like
+# `--bare` but also copies all refs as-is. Useful for a full backup/move.
+git clone --mirror git@your-gitlab-site.com:username/repo.git
+
+# Change into newly created repo directory
+cd repo
+
+# Push to GitHub using the `--mirror` option.  The `--no-verify` option skips any hooks. 
+git push --no-verify --mirror git@github.com:username/repo.git
+
+# Set push URL to the mirror location
+git remote set-url --push origin git@github.com:username/repo.git
+
+# To periodically update the repo on GitHub with what you have in GitLab
+git fetch -p origin
+git push --no-verify --mirror
+```
+
+After doing this, the autolinking of issues/commits will work. See **Usage** for next steps.
+
 ## Usage
 
-Before using this script "copy" your gitlab repo with all the branches over to github. For this create a new repo with the infos (github.owner and github.repo) from the settings.js and push all the branches you need in the new repo. (Then will the autolinking of issues to commits work.) The user must be a member of the project you want to copy or else you won't see it in the first step.
+The user must be a member of the project you want to copy or else you won't see it in the first step.
 
 1. `cp sample_settings.js settings.js`
 1. edit settings.js
@@ -35,18 +60,21 @@ Leave it null for the first run of the script. Then the script will show you whi
 
 ### github
 
-#### github.url
+#### github.baseUrl
 
 Where is the github instance hosted? Default is the official `api.github.com` domain
-
-#### github.pathPrefix
-
-Only needed when using github enterprise and not beeing hosted at the root of the domain
 
 #### github.owner
 
 Under which organisation or user will the new project be hosted
 
+#### github.username
+
+Go to your settings. Open the Access Token tab. Create a new Access Token and copy that into the `settings.js`
+
+#### github.token
+
+Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token and copy that into the `settings.js`
 
 #### github.repo
 
