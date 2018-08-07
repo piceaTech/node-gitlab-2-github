@@ -2,7 +2,7 @@ module.exports = {
   "gitlab": {
     "url": "http://gitlab.mycompany.com/", // probably: https://gitlab.com
     "token": "{{gitlab private token}}",
-    "projectID": null
+    "projectId": null
   },
   "github": {
     // "baseUrl":"https://gitlab.mycompany.com:123/etc",
@@ -18,5 +18,8 @@ module.exports = {
   "projectmap": {
     "gitlabgroup/projectname.1": "GitHubOrg/projectname.1",
     "gitlabgroup/projectname.2": "GitHubOrg/projectname.2"
+  },
+  "conversion": {
+    "useLowerCaseLabels": true
   }
 }

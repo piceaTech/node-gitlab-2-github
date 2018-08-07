@@ -1,6 +1,6 @@
-var GitHubApi = require('@octokit/rest')
+const GitHubApi = require('@octokit/rest')
 const Gitlab = require('gitlab').default
-var async = require('async');
+const async = require('async');
 
 try {
   var settings = require('./settings.js');
@@ -55,10 +55,12 @@ if (settings.gitlab.projectID === null) {
 
 // ----------------------------------------------------------------------------
 
-function listProjects() {
-  gitlab.Projects.all({membership: true}).then(function(projects) {
-    // sort projects by increasing ProjectID
-    projects = projects.sort(function(a, b) { return a.id - b.id; });
+/**
+ * List all projects that the GitLab user is associated with.
+ */
+async function listProjects() {
+  try {
+    let projects = await gitlab.Projects.all({membership: true});
 
     // print each project with info
     for (let i = 0; i < projects.length; i++) {
@@ -70,13 +72,95 @@ function listProjects() {
     console.log('Select which project ID should be transported to github. Edit the settings.json accordingly. (gitlab.projectID)');
     console.log('\n\n');
 
-  }).catch(function(err){
-    console.log('An Error occured while fetching all projects:');
-    console.log(err);
+  } catch (err) {
+    console.error('An Error occured while fetching all projects:');
+    console.error(err);
+  }
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Performs all of the migration tasks to move a GitLab repo to GitHub
+ */
+async function migrate() {
+
+  github.authenticate({
+    type: "basic",
+    username: settings.github.username,
+    password: settings.github.token
+  });
+
+  // transfer GitLab milestones to GitHub
+  transferMilestones(settings.gitlab.projectId);
+
+  // transfer GitLab labels to GitHub
+  transferLabels(settings.gitlab.projectId, settings.conversion.useLowerCaseLabels);
+
+  // create a hasAttachment label for manual attachment migration
+  const hasAttachmentLabel = {name: 'hasAttachment', color: '#fbca04'};
+  // createLabel(hasAttachmentLabel, function(err, createLabelData) {
+  //   console.log(createLabelData);
+  // });
+
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Transfer any milestones that exist in GitLab that do not exist in GitHub.
+ */
+async function transferMilestones(projectId) {
+  // Get a list of all milestones associated with this project
+  let milestones = await gitlab.ProjectMilestones.all(projectId);
+
+  // sort milestones in ascending order of when they were created (by id)
+  milestones = milestones.sort(function(a, b) { return a.id - b.id; });
+
+  // get a list of the current milestones in the new GitHub repo (likely to be empty)
+  let ghMilestones = await getAllGHMilestones(settings.github.owner, settings.github.repo);
+
+  // if a GitLab milestone does not exist in GitHub repo, create it.
+  milestones.forEach(function(milestone) {
+    if (!ghMilestones.find(m => m.title === milestone.title)) {
+      console.log("Creating " + milestone.title);
+    } else {
+      console.log("Already exists: " + milestone.title);
+    }
   });
 }
 
-function migrate() {
+// ----------------------------------------------------------------------------
+
+/**
+ * Transfer any labels that exist in GitLab that do not exist in GitHub.
+ */
+async function transferLabels(projectId, useLowerCase = true) {
+  // Get a list of all labels associated with this project
+  let labels = await gitlab.Labels.all(projectId);
+
+  // get a list of the current label names in the new GitHub repo (likely to be just the defaults)
+  let ghLabels = await getAllGHLabelNames(settings.github.owner, settings.github.repo);
+
+  // if a GitLab label does not exist in GitHub repo, create it.
+  labels.forEach(function(label) {
+
+    // GitHub prefers lowercase label names
+    if (useLowerCase) {
+      label.name = label.name.toLowerCase()
+    }
+
+    if (!ghLabels.find(l => l === label.name)) {
+      console.log("Creating " + label.name);
+    } else {
+      console.log("Already exists: " + label.name);
+    }
+  });
+}
+
+// ----------------------------------------------------------------------------
+
+function migrate1() {
 
   github.authenticate({
     type: "basic",
@@ -225,32 +309,49 @@ function createAllIssuesAndComments(milestoneData, callback) {
   }); // gitlab project Issues
 }
 
-function getAllGHMilestones(callback) {
-  github.issues.getMilestones({
-    owner: settings.github.owner,
-    repo: settings.github.repo,
-    state: 'all'
-  }, function(err, milestoneDataAll) {
-    if(err){
-        console.log(err);
-        console.log('getAllGHMilestones1');
-        console.log('FAIL!');
-        process.exit(1);
-      }
-      milestoneData = milestoneDataAll.data.map(function(item) {
-        return {
-          number: item.number,
-          title: item.title
-        };
-      });
-      milestoneDataMapped = milestoneData.map(function(item) {
-        return item.title;
-      });
-      return callback(milestoneData, milestoneDataMapped);
+// ----------------------------------------------------------------------------
 
-    }); // Milestones
+/**
+ * Get a list of all GitHub milestones currently in new repo
+ */
+async function getAllGHMilestones(owner, repo) {
+  try {
+    // get an array of GitHub milestones for the new repo
+    let result = await github.issues.getMilestones({owner: owner, repo: repo, state: 'all'});
 
+    // extract the milestone number and title and put into a new array
+    let milestones = result.data.map(x => ({number: x.number, title: x.title}));
+
+    return milestones;
+  } catch (err) {
+    console.error("Could not access all GitHub milestones");
+    console.error(err);
+    process.exit(1);
+  }
 }
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Get a list of all GitHub label names currently in new repo
+ */
+async function getAllGHLabelNames(owner, repo) {
+  try {
+    // get an array of GitHub labels for the new repo
+    let result = await github.issues.getLabels({owner: owner, repo: repo, per_page: 100});
+
+    // extract the label name and put into a new array
+    let labels = result.data.map(x => x.name);
+
+    return labels;
+  } catch (err) {
+    console.error("Could not access all GitHub label names");
+    console.error(err);
+    process.exit(1);
+  }
+}
+
+// ----------------------------------------------------------------------------
 
 function getAllGHIssues(callback) {
   var lastItem = null;
@@ -288,27 +389,6 @@ function getAllGHIssues(callback) {
     console.log('issue Count on GH:', allGhIssues.length)
     callback(err, allGhIssues);
   }); // async whilst
-}
-
-function getAllGHLabelNames(callback) {
-  github.issues.getLabels({
-    owner: settings.github.owner,
-    repo: settings.github.repo,
-    per_page: 100
-  }, function(err, labelData) {
-    if (err){
-        console.log(err);
-        console.log('getAllGHLabelNames');
-        console.log('FAIL!');
-        process.exit(1);
-    }
-    var labelNames = labelData.data.map(function(item) {
-      return item.name;
-    });
-
-    return callback(labelNames);
-  });
-
 }
 
 function hasNext(item) {
