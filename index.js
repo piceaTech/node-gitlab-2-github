@@ -91,14 +91,20 @@ async function migrate() {
     password: settings.github.token
   });
 
+  //
+  // Sequentially transfer repo things
+  //
+
   // transfer GitLab milestones to GitHub
-  transferMilestones(settings.gitlab.projectId);
+  await transferMilestones(settings.gitlab.projectId);
 
   // transfer GitLab labels to GitHub
-  transferLabels(settings.gitlab.projectId, true, settings.conversion.useLowerCaseLabels);
+  await transferLabels(settings.gitlab.projectId, true, settings.conversion.useLowerCaseLabels);
 
   // Transfer issues with their comments
-  transferIssues(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
+  await transferIssues(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
+
+  console.log("\n\nTransfer complete!\n\n");
 }
 
 // ----------------------------------------------------------------------------
