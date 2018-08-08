@@ -115,19 +115,31 @@ async function transferMilestones(projectId) {
   let milestones = await gitlab.ProjectMilestones.all(projectId);
 
   // sort milestones in ascending order of when they were created (by id)
-  milestones = milestones.sort(function(a, b) { return a.id - b.id; });
+  milestones = milestones.sort((a, b) => a.id - b.id);
 
   // get a list of the current milestones in the new GitHub repo (likely to be empty)
   let ghMilestones = await getAllGHMilestones(settings.github.owner, settings.github.repo);
 
   // if a GitLab milestone does not exist in GitHub repo, create it.
-  milestones.forEach(function(milestone) {
-    if (!ghMilestones.find(m => m.title === milestone.title)) {
-      console.log("Creating " + milestone.title);
-    } else {
-      console.log("Already exists: " + milestone.title);
-    }
-  });
+  for (let milestone of milestones) {
+      if (!ghMilestones.find(m => m.title === milestone.title)) {
+        console.log("Creating " + milestone.title);
+        try {
+
+          // process asynchronous code in sequence
+          await (() => {
+            createMilestone(settings.github.owner, settings.github.repo, milestone)
+          })(milestone);
+
+        } catch (err) {
+          console.error("Could not create milestone", milestone.title);
+          console.error(err);
+        }
+      } else {
+        console.log("Already exists: " + milestone.title);
+      }
+  };
+
 }
 
 // ----------------------------------------------------------------------------
@@ -528,19 +540,30 @@ function createAllIssueComments(projectID, issueID, newIssueData, callback) {
 }
 
 
-function createMilestone(data, cb) {
-  let item = {
-    owner: settings.github.owner,
-    repo: settings.github.repo,
-    title: data.title,
-    description: data.description,
-    state: (data.state === 'active') ? 'open' : 'closed'
+// ----------------------------------------------------------------------------
+
+/**
+ * Create a GitHub milestone from a GitLab milestone
+ */
+async function createMilestone(owner, repo, milestone) {
+  // convert from GitLab to GitHub
+  let ghMilestone = {
+    owner: owner,
+    repo: repo,
+    title: milestone.title,
+    description: milestone.description,
+    state: (milestone.state === 'active') ? 'open' : 'closed'
   };
-  if (data.due_date){
-    item.due_on = data.due_date + 'T00:00:00Z';
+
+  if (milestone.due_date) {
+    ghMilestone.due_on = milestone.due_date + 'T00:00:00Z';
   }
-  github.issues.createMilestone(item, cb);
+
+  // create the GitHub milestone
+  return await github.issues.createMilestone(ghMilestone);
 }
+
+// ----------------------------------------------------------------------------
 
 function createLabel(glLabel, cb) {
   github.issues.createLabel({
