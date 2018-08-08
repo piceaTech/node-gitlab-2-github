@@ -6,7 +6,7 @@ try {
   var settings = require('./settings.js');
 } catch(e) {
   if (e.code === 'MODULE_NOT_FOUND') {
-    console.log('\n\nPlease copy the sample_settings.json to settings.json.');
+    console.log('\n\nPlease copy the sample_settings.js to settings.js.');
   } else {
     console.log(e);
   }
@@ -14,13 +14,13 @@ try {
   process.exit(1);
 }
 
-// Ensure that the GitLab URL and token has been set in settings.json
+// Ensure that the GitLab URL and token has been set in settings.js
 if (!settings.gitlab.url || settings.gitlab.url === "http://gitlab.mycompany.com/") {
-  console.log('\n\nYou have to enter your gitlab url in the settings.json file.');
+  console.log('\n\nYou have to enter your GitLab url in the settings.js file.');
   process.exit(1);
 }
 if (!settings.gitlab.token || settings.gitlab.token === "{{gitlab private token}}") {
-  console.log('\n\nYou have to enter your gitlab private token in the settings.json file.');
+  console.log('\n\nYou have to enter your GitLab private token in the settings.js file.');
   process.exit(1);
 }
 
@@ -44,7 +44,7 @@ var github = new GitHubApi({
 // regex for converting user from GitLab to GitHub
 var userProjectRe = generateUserProjectRe();
 
-// If no project id is given in settings.json, just return
+// If no project id is given in settings.js, just return
 // all of the projects that this user is associated with.
 if (settings.gitlab.projectID === null) {
   listProjects();
@@ -69,7 +69,7 @@ async function listProjects() {
 
     // instructions for user
     console.log('\n\n');
-    console.log('Select which project ID should be transported to github. Edit the settings.json accordingly. (gitlab.projectID)');
+    console.log('Select which project ID should be transported to github. Edit the settings.js accordingly. (gitlab.projectID)');
     console.log('\n\n');
 
   } catch (err) {
@@ -97,6 +97,8 @@ async function migrate() {
   // transfer GitLab labels to GitHub
   transferLabels(settings.gitlab.projectId, true, settings.conversion.useLowerCaseLabels);
 
+  // Transfer issues with their comments
+  transferIssues(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
 }
 
 // ----------------------------------------------------------------------------
@@ -187,153 +189,78 @@ async function transferLabels(projectId, attachmentLabel = true, useLowerCase = 
 
 // ----------------------------------------------------------------------------
 
-function migrate1() {
+/**
+ * Transfer any issues and their comments that exist in GitLab that do not exist in GitHub.
+ */
+async function transferIssues(owner, repo, projectId) {
 
-  github.authenticate({
-    type: "basic",
-    username: settings.github.username,
-    password: settings.github.token
-  });
+  // Because each 
+  let milestoneData = await getAllGHMilestones(owner, repo);
 
-  gitlab.ProjectMilestones.all(settings.gitlab.projectID).then(function(data) {
-    console.log('Amount of gitlab milestones', data.length);
-    data = data.sort(function(a, b) { return a.id - b.id; });
-    getAllGHMilestones(function(milestoneDataA, milestoneDataMappedA) {
-      // for now use globals
-      milestoneData = milestoneDataA;
-      milestoneDataMapped = milestoneDataMappedA;
+  // get a list of all GitLab issues associated with this project
+  // TODO return all issues via pagination
+  let issues = await gitlab.Issues.all({projectId: projectId});
 
-      console.log('\n\n\n\n\n\n\nMilestones>>>>');
-      console.log(milestoneDataMapped);
-      console.log('\n\n\n\n\n\n\n');
+  // sort issues in ascending order of when they were created (by id)
+  issues = issues.sort((a, b) => a.id - b.id);
 
-      async.each(data, function(item, cb) {
-        if (milestoneDataMapped.indexOf(item.title) < 0) {
-          console.log('Creating new Milestone', item.title);
-          createMilestone(item, function(err, createMilestoneData) {
-            console.log(createMilestoneData);
-            return cb(err);
-          });
-        } else {
-          return cb(null);
-        }
-      }, function(err) {
-        if (err) return console.log(err);
-        // all milestones are created
-        getAllGHMilestones(function(milestoneDataA, milestoneDataMappedA) {
-          // create labels
-          gitlab.Labels.all(settings.gitlab.projectID).then(function(glLabels) {
-            getAllGHLabelNames(function(ghlabelNames) {
-              async.each(glLabels, function(glLabel, cb) {
-                if (ghlabelNames.indexOf(glLabel.name) < 0) {
-                  console.log('Creating new Label', glLabel.name);
-                  createLabel(glLabel, function(err, createLabelData) {
-                    console.log(createLabelData);
-                    return cb(err);
-                  });
-                } else {
-                  return cb(null);
-                }
-              }, function(err) {
-                // if (err) return console.log(err);
-                // all labels are created, create a hasAttachment label for manual attachment migration
-                var glLabel = {
-                  name: 'hasAttachment',
-                  color: '#fbca04'
-                }
-                createLabel(glLabel, function(err, createLabelData) {
-                  console.log(createLabelData);
-                });
+  // get a list of the current issues in the new GitHub repo (likely to be empty)
+  let ghIssues = await getAllGHIssues(settings.github.owner, settings.github.repo);
 
-                // for now use globals
-                milestoneData = milestoneDataA;
-                milestoneDataMapped = milestoneDataMappedA;
+  inform("Transferring " + issues.length.toString() + " Issues");
 
-                createAllIssuesAndComments(milestoneData, function(err, data) {
-                  console.log('\n\n\n\nFinished creating all issues and Comments\n\n\n\n');
-                  console.log('err and data:', err, data);
-                });
-              }); //async
-            }); // getAllGHLabelNames
-          }).catch(function(err){
-            console.log('An Error occured while loading all labels:');
-            console.log(err);
-          }); // gitlab list labels
-        }); // getAllGHMilestones
-      }); // async
-    })
-  }).catch(function(err){
-    console.log('An Error occured while loading all milestones:');
-    console.log(err);
-  }); // gitlab list milestones
-}
+  //
+  // Create Placeholder Issues
+  //
 
+  // Create placeholder issues so that new GitHub issues will have the same
+  // issue number as in GitLab. If a placeholder is used it is because there
+  // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
+  const placeholderItem = {
+    title: 'placeholder issue for issue which does not exist and was probably deleted in GitLab',
+    description: 'This is to ensure the issue numbers in GitLab and GitHub are the same',
+    state: 'closed'
+  }
 
-function createAllIssuesAndComments(milestoneData, callback) {
-  // select all issues and comments from this project
-  gitlab.Issues.all({projectId: settings.gitlab.projectID}).then(function(issueData) {
-    // TODO return all issues via pagination
-    // look whether issue is already created
-    issueData = issueData.sort(function(a, b) {
-      return a.id - b.id;
-    });
-    console.log('length Issue GitLab:', issueData.length);
+  for (let i=0; i<issues.length; i++) {
+    // GitLab issue internal Id (iid)
+    let expectedIdx = i+1;
 
-    // loop through all issues and add placeholder issues if there are gaps
-    // this is to ensure issue id's are the same in gitlab and GitHub
-    var placeHolderItem = {
-      title: 'Place holder issue for issue which does not exist probably deleted in Gitlab',
-      description: 'This is to ensure the issue ids in Gitlab and GitHub are the same',
-      state: 'closed'
+    // is there a gap in the GitLab issues?
+    if (issues[i].iid != expectedIdx) {
+      issues.splice(i, 0, placeholderItem);
+      i++;
+      console.log("Added placeholder issue for GitLab issue #" + expectedIdx)
     }
-    for (var iIssue = 0; iIssue < issueData.length; iIssue++) {
-      if (issueData[iIssue].iid != iIssue + 1) {
-        issueData.splice(iIssue, 0, placeHolderItem);
-        iIssue++;
-        console.log('Added placeholder item for missing issue with id:', iIssue + 1);
+  }
+
+  //
+  // Create GitHub issues for each GitLab issue
+  //
+
+  // if a GitLab issue does not exist in GitHub repo, create it -- along with comments.
+  for (let issue of issues) {
+    // try to find a GitHub issue that already exists for this GitLab issue
+    let ghIssue = ghIssues.find(i => i.title.trim() === issue.title.trim());
+    if (true || !ghIssue) {
+      console.log("Creating: " + issue.iid + " - " + issue.title);
+      try {
+
+        // process asynchronous code in sequence
+        await (() => {
+          createIssueAndComments(settings.github.owner, settings.github.repo, milestoneData, issue).catch(x=>{});
+        })(issue);
+
+      } catch (err) {
+        console.error("Could not create issue: " + issue.iid + " - " + issue.title);
+        console.error(err);
       }
+    } else {
+      console.log("Already exists: " + issue.iid + " - " + issue.title);
+      updateIssueState(ghIssue, issue);
     }
+  };
 
-    getAllGHIssues(function(err, ghIssues) {
-      if(err){
-        console.log(err);
-        console.log('getAllGHIssues');
-        console.log('FAIL!');
-        process.exit(1);
-      }
-      ghIssuesMapped = ghIssues.map(function(item) {
-        return item.title;
-      });
-      console.log('length Issue GitHub:', ghIssues.length);
-
-      async.eachSeries(issueData, function(item, cb) {
-        if (item.milestone) {
-          var title = findMileStoneforTitle(milestoneData, item.milestone.title)
-          if (title !== null) {
-            console.log('title', title);
-          }
-        }
-        if (ghIssuesMapped.indexOf(item.title.trim()) < 0) {
-          console.log('Creating new Issue', item.title.trim());
-          createIssueAndComments(item, function(err, createIssueData) {
-            console.log(createIssueData);
-            return cb(err);
-          });
-        } else {
-          var ghIssue = ghIssues.filter(function(element, index, array) {
-            return element.title == item.title.trim();
-          });
-          return makeCorrectState(ghIssue[0], item, cb);
-        }
-      }, function(err) {
-        if (err) console.log('error with issueData:', err);
-        callback(err);
-      }); // each series
-    }); // getAllGHIssues
-  }).catch(function(err){
-    console.log('An Error occured while fetching all issues:');
-    console.log(err);
-  }); // gitlab project Issues
 }
 
 // ----------------------------------------------------------------------------
@@ -380,180 +307,203 @@ async function getAllGHLabelNames(owner, repo) {
 
 // ----------------------------------------------------------------------------
 
-function getAllGHIssues(callback) {
-  var lastItem = null;
-  var curPage = 1;
-  var allGhIssues = [];
-  async.whilst(function() {
-    return hasNext(lastItem)
-  }, function(cb) {
-    github.issues.getForRepo({
-      owner: settings.github.owner,
-      repo: settings.github.repo,
-      state: 'all',
-      per_page: 100,
-      page: curPage
-    }, function(err, ghIssues) {
-      if(err){
-        console.log(err);
-        console.log('getAllGHIssues');
-        console.log('FAIL!');
-        process.exit(1);
-      }
-      console.log('got page', curPage, 'with', ghIssues.data.length, 'entries');
-      console.log('\n\n\n');
-      console.log('ghIssues.meta', ghIssues.meta);
+/**
+ * Get a list of all the current GitHub issues.
+ * This uses a while loop to make sure that each page of issues is received.
+ */
+async function getAllGHIssues(owner, repo) {
+  let allIssues = []
+  let page = 1;
+  const perPage = 100;
 
-      curPage++;
-      lastItem = ghIssues;
-      var l = ghIssues.data.length;
-      for (var i = 0; i < l; i++) {
-        allGhIssues[allGhIssues.length] = ghIssues.data[i];
-      }
-      cb(err);
-    }); // gh repo Issues
-  }, function(err) {
-    console.log('issue Count on GH:', allGhIssues.length)
-    callback(err, allGhIssues);
-  }); // async whilst
-}
+  while (true) {
+    // get a paginated list of issues
+    const issues = await github.issues.getForRepo({owner: owner, repo: repo, state: 'all', per_page: perPage, page: page });
 
-function hasNext(item) {
-  if (item === null) {
-    return true;
-  } else if (item.meta.link == undefined || item.meta.link.indexOf('next') < 0) {
-    return false
-  } else {
-    return true
+    // if this page has zero issues then we are done!
+    if (issues.data.length === 0)
+      break;
+
+    // join this list of issues with the master list
+    allIssues = allIssues.concat(issues.data);
+
+    // if there are strictly less issues on this page than the maximum number per page
+    // then we can be sure that this is all the issues. No use querying again.
+    if (issues.data.length < perPage)
+      break;
+
+    // query for the next page of issues next iteration
+    page++;
   }
 
+  return allIssues;
 }
 
+// ----------------------------------------------------------------------------
 
-function findMileStoneforTitle(milestoneData, title) {
-  for (var i = milestoneData.length - 1; i >= 0; i--) {
-    if (milestoneData[i].title == title) {
-      console.log('findMileStoneforTitle', milestoneData[i].number);
-      return milestoneData[i].number;
+/**
+ *
+ */
+async function createIssueAndComments(owner, repo, milestones, issue) {
+
+  // create the issue in GitHub
+  let ghIssueData = await createIssue(owner, repo, milestones, issue);
+  let ghIssue = ghIssueData.data;
+
+  // add any comments/notes associated with this issue
+  await createIssueComments(ghIssue, issue);
+
+  // make sure to close the GitHub issue if it is closed in GitLab
+  await updateIssueState(ghIssue, issue);
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ *
+ */
+async function createIssue(owner, repo, milestones, issue) {
+  let props = {
+    owner: owner,
+    repo: repo,
+    title: issue.title.trim(),
+    body: issue.description
+  };
+
+
+  // convertIssuesAndComments(item.description, item, function(bodyConverted) {
+  //   props = {
+  //     owner: settings.github.owner,
+  //     repo: settings.github.repo,
+  //     title: item.title.trim(),
+  //     body: bodyConverted
+  //   };
+  // });
+
+  //
+  // Issue Assignee
+  //
+
+  // If the GitLab issue has an assignee, make sure to carry it over -- but only
+  // if the username is a valid GitHub username.
+  if (issue.assignee) {
+    props.assignees = [];
+    if (issue.assignee.username == settings.github.username) {
+      props.assignees.push(settings.github.username);
+    } else if (settings.usermap && settings.usermap[issue.assignee.username]) {
+      // get GitHub username name from settings
+      props.assignees.push(settings.usermap[item.assignee.username]);
     }
   }
-  return null;
+
+  //
+  // Issue Milestone
+  //
+
+  // if the GitLab issue has an associated milestone, make sure to attach it.
+  if (issue.milestone) {
+    let milestone = milestones.find(m => m.title === issue.milestone.title);
+    if (milestone) {
+      props.milestone = milestone.number;
+    }
+  }
+
+  //
+  // Issue Labels
+  //
+
+  // make sure to add any labels that existed in GitLab
+  if (issue.labels) {
+    props.labels = issue.labels;
+  }
+
+  //
+  // Issue Attachments
+  //
+
+  // if the issue contains a url that contains "/uploads/", it is likely to
+  // have an attachment. Therefore, add the "has attachment" label.
+  if (props.body && props.body.indexOf('/uploads/') > -1) {
+    props.labels.push('has attachment');
+  }
+
+  // create the GitHub issue from the GitLab issue
+  return github.issues.create(props);
 }
 
-function createIssueAndComments(item, callback) {
-  var props = null;
-  convertIssuesAndComments(item.description, item, function(bodyConverted) {
-    props = {
-      owner: settings.github.owner,
-      repo: settings.github.repo,
-      title: item.title.trim(),
-      body: bodyConverted
+// ----------------------------------------------------------------------------
+
+/**
+ *
+ */
+async function createIssueComments(ghIssue, issue) {
+  // retrieve any notes/comments associated with this issue
+  try {
+    let notes = await gitlab.IssueNotes.all(settings.gitlab.projectId, issue.iid);
+
+    // if there are no notes, then there is nothing to do!
+    if (notes.length == 0) return;
+
+    // sort notes in ascending order of when they were created (by id)
+    notes = notes.sort((a, b) => a.id - b.id);
+
+    for (let note of notes) {
+
+      if ((/Status changed to .*/.test(note.body) && !/Status changed to closed by commit.*/.test(note.body)) ||
+          /changed milestone to .*/.test(note.body) ||
+          /Milestone changed to .*/.test(note.body) ||
+          /Reassigned to /.test(note.body) ||
+          /added .* labels/.test(note.body) ||
+          /Added ~.* label/.test(note.body) ||
+          /mentioned in issue.*/.test(note.body)) {
+        // Don't transfer when the state changed (this is a note in GitLab)
+      } else {
+        // process asynchronous code in sequence
+        await (async () => {
+          await github.issues.createComment({
+                      owner: settings.github.owner,
+                      repo: settings.github.repo,
+                      number: ghIssue.number,
+                      body: note.body
+                    }).catch(x=>{});
+        })(ghIssue, note);
+
+        // convertIssuesAndComments(issue.body, issue, function(bodyConverted) {
+        //   github.issues.createComment({
+        //     owner: settings.github.owner,
+        //     repo: settings.github.repo,
+        //     number: ghIssue.number,
+        //     body: bodyConverted
+        //   }, cb);
+        // });
+      }
+
     };
-  });
-  if (item.assignee) {
-    if (item.assignee.username == settings.github.username) {
-      props.assignee = item.assignee.username;
-    } else if (settings.usermap && settings.usermap[item.assignee.username]) {
-      // get github username name from config
-      props.assignee = settings.usermap[item.assignee.username];
-    }
+  } catch (err) {
+    console.error("Could not fetch notes for GitLab issue #" + issue.number);
+    console.error(err);
   }
-  if (item.milestone) {
-    var title = findMileStoneforTitle(milestoneData, item.milestone.title)
-    if (title !== null) {
-      props.milestone = title;
-    } else {
-
-      // TODO also import issues where milestone got deleted
-      // return callback();
-    }
-  }
-  if (item.labels) {
-    props.labels = item.labels;
-
-    // add hasAttachment label if body contains an attachment for manual migration
-    if (props.body && props.body.indexOf('/uploads/') > -1) {
-      props.labels.push('hasAttachment');
-    }
-  }
-  console.log('props', props);
-  github.issues.create(props, function(err, newIssueData) {
-    if (!err) {
-      createAllIssueComments(settings.gitlab.projectID, item.iid, newIssueData.data, function(err, issueData) {
-        makeCorrectState(newIssueData.data, item, callback);
-      });
-    } else {
-      console.log('errData', err, newIssueData);
-      return callback(err);
-    }
-  });
 }
 
+// ----------------------------------------------------------------------------
 
-function makeCorrectState(ghIssueData, item, callback) {
-  if (item.state != 'closed' || ghIssueData.state == 'closed') {
-    // standard is open so we don't have to update
-    return callback(null, ghIssueData);
-  }
+/**
+ * Update the issue state (i.e., closed or open).
+ */
+async function updateIssueState(ghIssue, issue) {
+  // default state is open so we don't have to update if the issue is closed.
+  if (issue.state != 'closed' || ghIssue.state == 'closed') return;
 
-  // TODO get props
-  var props = {
+  let props = {
     owner: settings.github.owner,
     repo: settings.github.repo,
-    number: ghIssueData.number,
-    state: 'closed',
+    number: ghIssue.number,
+    state: issue.state
   };
-  if (item.milestone) {
-    var title = findMileStoneforTitle(milestoneData, item.milestone.title);
-    if (title !== null) {
-      props.milestone = title;
-    }
-  }
 
-  console.log('makeCorrectState', ghIssueData.number, item.state, props.milestone);
-  console.log('makeCorrectState props', props);
-  github.issues.edit(props, callback);
+  // make the state update
+  return github.issues.edit(props);
 }
-
-function createAllIssueComments(projectID, issueID, newIssueData, callback) {
-  if (issueID == null) {
-    return callback();
-  }
-  // get all comments add them to the comment
-  console.log(`fetching all notes for issue ${issueID}`);
-  gitlab.IssueNotes.all(projectID, issueID).then(function(data) {
-    if (data.length) {
-      data = data.sort(function(a, b) {
-        return a.id - b.id;
-      });
-      async.eachSeries(data, function(item, cb) {
-        if ((/Status changed to .*/.test(item.body) && !/Status changed to closed by commit.*/.test(item.body)) ||
-            /changed milestone to .*/.test(item.body) ||
-            /Reassigned to /.test(item.body) ||
-            /added .* labels/.test(item.body) ||
-            /mentioned in issue.*/.test(item.body)) {
-          // don't transport when the state changed (is a note in gitlab)
-          return cb();
-        } else {
-          convertIssuesAndComments(item.body, item, function(bodyConverted) {
-            github.issues.createComment({
-              owner: settings.github.owner,
-              repo: settings.github.repo,
-              number: newIssueData.number,
-              body: bodyConverted
-            }, cb);
-        });
-        }
-      }, callback)
-    } else {
-      callback();
-    }
-  }).catch(function(err){
-    console.log(`An Error occured while fetching all notes for issue ${issueID}:`);
-    console.log(err);
-  });
-}
-
 
 // ----------------------------------------------------------------------------
 
@@ -599,22 +549,23 @@ async function createLabel(owner, repo, label) {
 // ----------------------------------------------------------------------------
 
 /**
- * Converts issue body and issue comments from gitlab to github. That means:
+ * Converts issue body and issue comments from GitLab to GitHub. That means:
  * - Add a line at the beginning indicating which original user created the
- *   issue or the comment and when - because the github API creates everything
+ *   issue or the comment and when - because the GitHub API creates everything
  *   as the API user
- * - Change username from gitlab to github in "mentions" (@username)
+ * - Change username from GitLab to GitHub in "mentions" (@username)
  */
-function convertIssuesAndComments(str, item, cb){
-  if ( (settings.usermap == null || Object.keys(settings.usermap).length == 0) &&
+function convertIssuesAndComments(str, issue, cb) {
+
+  if ((settings.usermap == null || Object.keys(settings.usermap).length == 0) &&
         (settings.projectmap == null || Object.keys(settings.projectmap).length == 0)) {
-    addMigrationLine(str, item, cb);
+    return addMigrationLine(str, issue);
   } else {
     // - Replace userids as defined in settings.usermap.
     //   They all start with '@' in the issues but we have them without in usermap
     // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
     //   They all have a '#' right after the project name in the issues but we have them without in projectmap
-    addMigrationLine(str, item, function(strWithMigLine) {
+    addMigrationLine(str, issue, function(strWithMigLine) {
       cb(strWithMigLine.replace(userProjectRe, function(matched) {
         if (matched.startsWith('@')) {
           // this is a userid
@@ -631,10 +582,16 @@ function convertIssuesAndComments(str, item, cb){
   }
 }
 
-function addMigrationLine(str, item, cb) {
+// ----------------------------------------------------------------------------
 
-  if (item == null || item.author == null || item.author.username == null || item.created_at == null) {
-    return cb(str);
+/**
+ * Adds a line of text at the beginning of a comment that indicates who, when
+ * and from GitLab.
+ */
+function addMigrationLine(str, issue) {
+
+  if (issue == null || issue.author == null || issue.author.username == null || issue.created_at == null) {
+    return str;
   }
 
   var dateformatOptions = {
@@ -646,10 +603,12 @@ function addMigrationLine(str, item, cb) {
     hour12: false
   }
 
-  var formattedDate = new Date(item.created_at).toLocaleString('en-US', dateformatOptions);
+  var formattedDate = new Date(issue.created_at).toLocaleString('en-US', dateformatOptions);
 
-  return cb("In gitlab by @" +item.author.username+ " on " +formattedDate+ "\n\n" +str);
+  return "In GitLab by @" + issue.author.username + " on " + formattedDate + "\n\n" + str;
 }
+
+// ----------------------------------------------------------------------------
 
 /**
  * Generate regular expression which finds userid and cross-project issue references
@@ -669,6 +628,8 @@ function generateUserProjectRe() {
 
   return new RegExp(reString,'g');
 }
+
+// ----------------------------------------------------------------------------
 
 /**
  * Print out a section heading to let the user know what is happening
