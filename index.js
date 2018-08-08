@@ -49,7 +49,7 @@ var userProjectRe = generateUserProjectRe();
 if (settings.gitlab.projectID === null) {
   listProjects();
 } else {
-  // user has choosen a project
+  // user has chosen a project
   migrate();
 }
 
@@ -95,13 +95,7 @@ async function migrate() {
   transferMilestones(settings.gitlab.projectId);
 
   // transfer GitLab labels to GitHub
-  transferLabels(settings.gitlab.projectId, settings.conversion.useLowerCaseLabels);
-
-  // create a hasAttachment label for manual attachment migration
-  const hasAttachmentLabel = {name: 'hasAttachment', color: '#fbca04'};
-  // createLabel(hasAttachmentLabel, function(err, createLabelData) {
-  //   console.log(createLabelData);
-  // });
+  transferLabels(settings.gitlab.projectId, true, settings.conversion.useLowerCaseLabels);
 
 }
 
@@ -120,15 +114,17 @@ async function transferMilestones(projectId) {
   // get a list of the current milestones in the new GitHub repo (likely to be empty)
   let ghMilestones = await getAllGHMilestones(settings.github.owner, settings.github.repo);
 
+  inform("Transferring Milestones");
+
   // if a GitLab milestone does not exist in GitHub repo, create it.
   for (let milestone of milestones) {
       if (!ghMilestones.find(m => m.title === milestone.title)) {
-        console.log("Creating " + milestone.title);
+        console.log("Creating: " + milestone.title);
         try {
 
           // process asynchronous code in sequence
           await (() => {
-            createMilestone(settings.github.owner, settings.github.repo, milestone)
+            createMilestone(settings.github.owner, settings.github.repo, milestone);
           })(milestone);
 
         } catch (err) {
@@ -147,27 +143,46 @@ async function transferMilestones(projectId) {
 /**
  * Transfer any labels that exist in GitLab that do not exist in GitHub.
  */
-async function transferLabels(projectId, useLowerCase = true) {
+async function transferLabels(projectId, attachmentLabel = true, useLowerCase = true) {
   // Get a list of all labels associated with this project
   let labels = await gitlab.Labels.all(projectId);
 
   // get a list of the current label names in the new GitHub repo (likely to be just the defaults)
   let ghLabels = await getAllGHLabelNames(settings.github.owner, settings.github.repo);
 
+  inform("Transferring Labels")
+
+  // create a hasAttachment label for manual attachment migration
+  if (attachmentLabel) {
+    const hasAttachmentLabel = {name: 'has attachment', color: '#fbca04'};
+    labels.push(hasAttachmentLabel);
+  }
+
   // if a GitLab label does not exist in GitHub repo, create it.
-  labels.forEach(function(label) {
+  for (let label of labels) {
 
-    // GitHub prefers lowercase label names
-    if (useLowerCase) {
-      label.name = label.name.toLowerCase()
-    }
+      // GitHub prefers lowercase label names
+      if (useLowerCase) {
+        label.name = label.name.toLowerCase()
+      }
 
-    if (!ghLabels.find(l => l === label.name)) {
-      console.log("Creating " + label.name);
-    } else {
-      console.log("Already exists: " + label.name);
-    }
-  });
+      if (!ghLabels.find(l => l === label.name)) {
+        console.log("Creating: " + label.name);
+        try {
+
+          // process asynchronous code in sequence
+          await (() => {
+            createLabel(settings.github.owner, settings.github.repo, label).catch(x=>{});
+          })(label);
+
+        } catch (err) {
+          console.error("Could not create label", label.name);
+          console.error(err);
+        }
+      } else {
+        console.log("Already exists: " + label.name);
+      }
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -565,14 +580,23 @@ async function createMilestone(owner, repo, milestone) {
 
 // ----------------------------------------------------------------------------
 
-function createLabel(glLabel, cb) {
-  github.issues.createLabel({
+/**
+ * Create a GitHub label from a GitLab label
+ */
+async function createLabel(owner, repo, label) {
+  // convert from GitLab to GitHub
+  let ghLabel = {
     owner: settings.github.owner,
     repo: settings.github.repo,
-    name: glLabel.name,
-    color: glLabel.color.substr(1) // remove leading "#" because gitlab returns it but github wants the color without it
-  }, cb);
+    name: label.name,
+    color: label.color.substr(1) // remove leading "#" because gitlab returns it but github wants the color without it
+  };
+
+  // create the GitHub label
+  return await github.issues.createLabel(ghLabel);
 }
+
+// ----------------------------------------------------------------------------
 
 /**
  * Converts issue body and issue comments from gitlab to github. That means:
@@ -644,4 +668,13 @@ function generateUserProjectRe() {
   }
 
   return new RegExp(reString,'g');
+}
+
+/**
+ * Print out a section heading to let the user know what is happening
+ */
+function inform(msg) {
+  console.log("==================================");
+  console.log(msg)
+  console.log("==================================");
 }
