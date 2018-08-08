@@ -246,10 +246,8 @@ async function transferIssues(owner, repo, projectId) {
       console.log("Creating: " + issue.iid + " - " + issue.title);
       try {
 
-        // process asynchronous code in sequence
-        await (() => {
-          createIssueAndComments(settings.github.owner, settings.github.repo, milestoneData, issue).catch(x=>{});
-        })(issue);
+        // process asynchronous code in sequence -- treats the code sort of like blocking
+        await createIssueAndComments(settings.github.owner, settings.github.repo, milestoneData, issue);
 
       } catch (err) {
         console.error("Could not create issue: " + issue.iid + " - " + issue.title);
@@ -453,15 +451,13 @@ async function createIssueComments(ghIssue, issue) {
 
         let bodyConverted = convertIssuesAndComments(note.body, note);
 
-        // process asynchronous code in sequence
-        await (async () => {
-          await github.issues.createComment({
-                      owner: settings.github.owner,
-                      repo: settings.github.repo,
-                      number: ghIssue.number,
-                      body: bodyConverted
-                    }).catch(x=>{});
-        })(ghIssue, note);
+        // process asynchronous code in sequence -- treats kind of like blocking
+        await github.issues.createComment({
+                    owner: settings.github.owner,
+                    repo: settings.github.repo,
+                    number: ghIssue.number,
+                    body: bodyConverted
+                  }).catch(x=>{});
 
       }
 
