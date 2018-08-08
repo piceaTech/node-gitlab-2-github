@@ -242,7 +242,7 @@ async function transferIssues(owner, repo, projectId) {
   for (let issue of issues) {
     // try to find a GitHub issue that already exists for this GitLab issue
     let ghIssue = ghIssues.find(i => i.title.trim() === issue.title.trim());
-    if (true || !ghIssue) {
+    if (!ghIssue) {
       console.log("Creating: " + issue.iid + " - " + issue.title);
       try {
 
@@ -363,22 +363,14 @@ async function createIssueAndComments(owner, repo, milestones, issue) {
  *
  */
 async function createIssue(owner, repo, milestones, issue) {
+  let bodyConverted = convertIssuesAndComments(issue.description, issue);
+
   let props = {
     owner: owner,
     repo: repo,
     title: issue.title.trim(),
-    body: issue.description
+    body: bodyConverted
   };
-
-
-  // convertIssuesAndComments(item.description, item, function(bodyConverted) {
-  //   props = {
-  //     owner: settings.github.owner,
-  //     repo: settings.github.repo,
-  //     title: item.title.trim(),
-  //     body: bodyConverted
-  //   };
-  // });
 
   //
   // Issue Assignee
@@ -458,24 +450,19 @@ async function createIssueComments(ghIssue, issue) {
           /mentioned in issue.*/.test(note.body)) {
         // Don't transfer when the state changed (this is a note in GitLab)
       } else {
+
+        let bodyConverted = convertIssuesAndComments(note.body, note);
+
         // process asynchronous code in sequence
         await (async () => {
           await github.issues.createComment({
                       owner: settings.github.owner,
                       repo: settings.github.repo,
                       number: ghIssue.number,
-                      body: note.body
+                      body: bodyConverted
                     }).catch(x=>{});
         })(ghIssue, note);
 
-        // convertIssuesAndComments(issue.body, issue, function(bodyConverted) {
-        //   github.issues.createComment({
-        //     owner: settings.github.owner,
-        //     repo: settings.github.repo,
-        //     number: ghIssue.number,
-        //     body: bodyConverted
-        //   }, cb);
-        // });
       }
 
     };
@@ -555,30 +542,33 @@ async function createLabel(owner, repo, label) {
  *   as the API user
  * - Change username from GitLab to GitHub in "mentions" (@username)
  */
-function convertIssuesAndComments(str, issue, cb) {
+function convertIssuesAndComments(str, item) {
 
   if ((settings.usermap == null || Object.keys(settings.usermap).length == 0) &&
         (settings.projectmap == null || Object.keys(settings.projectmap).length == 0)) {
-    return addMigrationLine(str, issue);
+    return addMigrationLine(str, item);
   } else {
     // - Replace userids as defined in settings.usermap.
     //   They all start with '@' in the issues but we have them without in usermap
     // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
     //   They all have a '#' right after the project name in the issues but we have them without in projectmap
-    addMigrationLine(str, issue, function(strWithMigLine) {
-      cb(strWithMigLine.replace(userProjectRe, function(matched) {
-        if (matched.startsWith('@')) {
-          // this is a userid
-          return '@' + settings.usermap[matched.substr(1)];
-        } else if (matched.endsWith('#')) {
-          // this is a cross-project issue reference
-          return settings.projectmap[matched.substring(0, matched.length-1)] + '#';
-        } else {
-          // something went wrong, do nothing
-          return matched;
-        }
-      }));
+    let strWithMigLine = addMigrationLine(str, item);
+
+    strWithMigLine.replace(userProjectRe, matched => {
+      if (matched.startsWith('@')) {
+        // this is a userid
+        return '@' + settings.usermap[matched.substr(1)];
+      } else if (matched.endsWith('#')) {
+        // this is a cross-project issue reference
+        return settings.projectmap[matched.substring(0, matched.length-1)] + '#';
+      } else {
+        // something went wrong, do nothing
+        return matched;
+      }
     });
+
+    return strWithMigLine;
+
   }
 }
 
@@ -588,9 +578,9 @@ function convertIssuesAndComments(str, issue, cb) {
  * Adds a line of text at the beginning of a comment that indicates who, when
  * and from GitLab.
  */
-function addMigrationLine(str, issue) {
+function addMigrationLine(str, item) {
 
-  if (issue == null || issue.author == null || issue.author.username == null || issue.created_at == null) {
+  if (item == null || item.author == null || item.author.username == null || item.created_at == null) {
     return str;
   }
 
@@ -603,9 +593,9 @@ function addMigrationLine(str, issue) {
     hour12: false
   }
 
-  var formattedDate = new Date(issue.created_at).toLocaleString('en-US', dateformatOptions);
+  var formattedDate = new Date(item.created_at).toLocaleString('en-US', dateformatOptions);
 
-  return "In GitLab by @" + issue.author.username + " on " + formattedDate + "\n\n" + str;
+  return "In GitLab by @" + item.author.username + " on " + formattedDate + "\n\n" + str;
 }
 
 // ----------------------------------------------------------------------------
