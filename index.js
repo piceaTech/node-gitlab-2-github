@@ -7,7 +7,7 @@ try{
 }
 catch(e){
   if(e.code === 'MODULE_NOT_FOUND'){
-    console.log('\n\nPlease copy the sample_settings.json to settings.json.');
+    console.log('\n\nPlease copy the sample_settings.js to settings.js.');
     process.exit(1);
   }
   else{
@@ -19,11 +19,11 @@ catch(e){
 console.log('\n\n\n');
 
 if(!settings.gitlab.url || settings.gitlab.url === "http://gitlab.mycompany.com/"){
-  console.log('\n\nYou have to enter your gitlab url in the settings.json file.');
+  console.log('\n\nYou have to enter your gitlab url in the settings.js file.');
   process.exit(1);
 }
 if(!settings.gitlab.token || settings.gitlab.token === "{{gitlab private token}}"){
-  console.log('\n\nYou have to enter your gitlab private token in the settings.json file.');
+  console.log('\n\nYou have to enter your gitlab private token in the settings.js file.');
   process.exit(1);
 }
 
@@ -44,7 +44,7 @@ if (settings.gitlab.projectID === null) {
       console.log('projects:', projects[i].id, projects[i].description, projects[i].name);
     }
     console.log('\n\n');
-    console.log('Select which project ID should be transported to github. Edit the settings.json accordingly. (gitlab.projectID)');
+    console.log('Select which project ID should be transported to github. Edit the settings.js accordingly. (gitlab.projectID)');
     console.log('\n\n');
   }).catch(function(err){
     console.log('An Error occured while fetching all projects:');
