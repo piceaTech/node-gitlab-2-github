@@ -113,6 +113,8 @@ async function migrate() {
  * Transfer any milestones that exist in GitLab that do not exist in GitHub.
  */
 async function transferMilestones(projectId) {
+  inform("Transferring Milestones");
+
   // Get a list of all milestones associated with this project
   let milestones = await gitlab.ProjectMilestones.all(projectId);
 
@@ -122,8 +124,6 @@ async function transferMilestones(projectId) {
   // get a list of the current milestones in the new GitHub repo (likely to be empty)
   let ghMilestones = await getAllGHMilestones(settings.github.owner, settings.github.repo);
 
-  inform("Transferring Milestones");
-
   // if a GitLab milestone does not exist in GitHub repo, create it.
   for (let milestone of milestones) {
       if (!ghMilestones.find(m => m.title === milestone.title)) {
@@ -131,9 +131,7 @@ async function transferMilestones(projectId) {
         try {
 
           // process asynchronous code in sequence
-          await (() => {
-            createMilestone(settings.github.owner, settings.github.repo, milestone);
-          })(milestone);
+          await createMilestone(settings.github.owner, settings.github.repo, milestone);
 
         } catch (err) {
           console.error("Could not create milestone", milestone.title);
@@ -152,13 +150,13 @@ async function transferMilestones(projectId) {
  * Transfer any labels that exist in GitLab that do not exist in GitHub.
  */
 async function transferLabels(projectId, attachmentLabel = true, useLowerCase = true) {
+  inform("Transferring Labels");
+
   // Get a list of all labels associated with this project
   let labels = await gitlab.Labels.all(projectId);
 
   // get a list of the current label names in the new GitHub repo (likely to be just the defaults)
   let ghLabels = await getAllGHLabelNames(settings.github.owner, settings.github.repo);
-
-  inform("Transferring Labels")
 
   // create a hasAttachment label for manual attachment migration
   if (attachmentLabel) {
@@ -179,9 +177,7 @@ async function transferLabels(projectId, attachmentLabel = true, useLowerCase = 
         try {
 
           // process asynchronous code in sequence
-          await (() => {
-            createLabel(settings.github.owner, settings.github.repo, label).catch(x=>{});
-          })(label);
+          await createLabel(settings.github.owner, settings.github.repo, label).catch(x=>{});
 
         } catch (err) {
           console.error("Could not create label", label.name);
@@ -199,6 +195,7 @@ async function transferLabels(projectId, attachmentLabel = true, useLowerCase = 
  * Transfer any issues and their comments that exist in GitLab that do not exist in GitHub.
  */
 async function transferIssues(owner, repo, projectId) {
+  inform("Transferring Issues");
 
   // Because each 
   let milestoneData = await getAllGHMilestones(owner, repo);
@@ -213,7 +210,7 @@ async function transferIssues(owner, repo, projectId) {
   // get a list of the current issues in the new GitHub repo (likely to be empty)
   let ghIssues = await getAllGHIssues(settings.github.owner, settings.github.repo);
 
-  inform("Transferring " + issues.length.toString() + " Issues");
+  console.log("Transferring " + issues.length.toString() + " issues");
 
   //
   // Create Placeholder Issues
@@ -463,7 +460,11 @@ async function createIssueComments(ghIssue, issue) {
                     repo: settings.github.repo,
                     number: ghIssue.number,
                     body: bodyConverted
-                  }).catch(x=>{});
+                  }).catch(x=>{
+                    console.error("could not create GitHub issue comment!");
+                    console.error(x);
+                    process.exit(1);
+                  });
 
       }
 
