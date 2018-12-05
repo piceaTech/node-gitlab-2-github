@@ -25,8 +25,9 @@
   },
   "homepage": "https://github.com/piceaTech/node-gitlab-2-github#readme",
   "dependencies": {
-    "@octokit/rest": "^15.2.5",
+    "@octokit/rest": "^16.1.0",
     "async": "^1.4.0",
-    "gitlab": "^3.7.0"
+    "gitlab": "^4.2.7",
+    "request": "^2.88.0"
   }
 }

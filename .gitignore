@@ -28,3 +28,11 @@ node_modules
 
 # ignore settings.js
 settings.js
+
+# ignore the log file
+merge-requests.json
+
+# ignore the lock
+package-lock.json
+
+.vscode/*

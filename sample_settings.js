@@ -7,7 +7,6 @@ module.exports = {
   "github": {
     // "baseUrl":"https://gitlab.mycompany.com:123/etc",
     "owner": "{{repository owner (user or organization)}}",
-    "username": "{{username}}",
     "token": "{{token}}",
     "repo": "{{repo}}"
   },
@@ -21,5 +20,10 @@ module.exports = {
   },
   "conversion": {
     "useLowerCaseLabels": true
+  },
+  "debug": true,
+  "mergeRequests": {
+    "logFile": "./merge-requests.json",
+    "log": false
   }
 }
