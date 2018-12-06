@@ -493,7 +493,13 @@ async function createIssue(owner, repo, milestones, issue) {
 
   // make sure to add any labels that existed in GitLab
   if (issue.labels) {
-    props.labels = issue.labels;
+    props.labels = issue.labels.filter(l => {
+      if (issue.state != 'closed') return true;
+
+      let lower = l.toLowerCase();
+      // ignore any labels that should have been removed when the issue was closed
+      return lower != 'doing' && lower != 'to do';
+    });
   }
 
   //
@@ -592,7 +598,7 @@ async function updateIssueState(ghIssue, issue) {
     return Promise.resolve(); 
   }
   // make the state update
-  return await github.issues.edit(props);
+  return await github.issues.update(props);
 }
 
 // ----------------------------------------------------------------------------
