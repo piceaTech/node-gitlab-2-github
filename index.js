@@ -557,7 +557,7 @@ function convertIssuesAndComments(str, item) {
     //   They all have a '#' right after the project name in the issues but we have them without in projectmap
     let strWithMigLine = addMigrationLine(str, item);
 
-    strWithMigLine.replace(userProjectRe, matched => {
+    strWithMigLine = strWithMigLine.replace(userProjectRe, matched => {
       if (matched.startsWith('@')) {
         // this is a userid
         return '@' + settings.usermap[matched.substr(1)];
