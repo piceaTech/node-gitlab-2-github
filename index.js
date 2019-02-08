@@ -2,6 +2,10 @@ const GitHubApi = require('@octokit/rest')
 const Gitlab = require('gitlab').default
 const async = require('async');
 
+const sleep = (milliseconds) => {
+  return new Promise(resolve => setTimeout(resolve, milliseconds))
+}
+
 try {
   var settings = require('./settings.js');
 } catch(e) {
@@ -199,7 +203,7 @@ async function transferIssues(owner, repo, projectId) {
 
   // Because each 
   let milestoneData = await getAllGHMilestones(owner, repo);
-
+  
   // get a list of all GitLab issues associated with this project
   // TODO return all issues via pagination
   let issues = await gitlab.Issues.all({projectId: projectId});
@@ -271,6 +275,7 @@ async function transferIssues(owner, repo, projectId) {
  */
 async function getAllGHMilestones(owner, repo) {
   try {
+    await sleep(2000);
     // get an array of GitHub milestones for the new repo
     let result = await github.issues.getMilestones({owner: owner, repo: repo, state: 'all'});
 
@@ -292,6 +297,7 @@ async function getAllGHMilestones(owner, repo) {
  */
 async function getAllGHLabelNames(owner, repo) {
   try {
+    await sleep(2000);
     // get an array of GitHub labels for the new repo
     let result = await github.issues.getLabels({owner: owner, repo: repo, per_page: 100});
 
@@ -318,6 +324,7 @@ async function getAllGHIssues(owner, repo) {
   const perPage = 100;
 
   while (true) {
+    await sleep(2000);
     // get a paginated list of issues
     const issues = await github.issues.getForRepo({owner: owner, repo: repo, state: 'all', per_page: perPage, page: page });
 
@@ -419,7 +426,7 @@ async function createIssue(owner, repo, milestones, issue) {
   if (props.body && props.body.indexOf('/uploads/') > -1) {
     props.labels.push('has attachment');
   }
-
+  await sleep(2000);
   // create the GitHub issue from the GitLab issue
   return github.issues.create(props);
 }
@@ -453,7 +460,8 @@ async function createIssueComments(ghIssue, issue) {
       } else {
 
         let bodyConverted = convertIssuesAndComments(note.body, note);
-
+        
+        await sleep(2000);
         // process asynchronous code in sequence -- treats kind of like blocking
         await github.issues.createComment({
                     owner: settings.github.owner,
@@ -490,9 +498,10 @@ async function updateIssueState(ghIssue, issue) {
     number: ghIssue.number,
     state: issue.state
   };
-
+  
+  await sleep(2000);
   // make the state update
-  return github.issues.edit(props);
+  return await github.issues.edit(props);
 }
 
 // ----------------------------------------------------------------------------
@@ -513,7 +522,8 @@ async function createMilestone(owner, repo, milestone) {
   if (milestone.due_date) {
     ghMilestone.due_on = milestone.due_date + 'T00:00:00Z';
   }
-
+  
+  await sleep(2000);
   // create the GitHub milestone
   return await github.issues.createMilestone(ghMilestone);
 }
@@ -531,6 +541,8 @@ async function createLabel(owner, repo, label) {
     name: label.name,
     color: label.color.substr(1) // remove leading "#" because gitlab returns it but github wants the color without it
   };
+  
+  await sleep(2000);
 
   // create the GitHub label
   return await github.issues.createLabel(ghLabel);
