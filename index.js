@@ -1,13 +1,15 @@
 const GitHubApi = require('@octokit/rest')
 const Gitlab = require('gitlab').default
 const async = require('async');
+const fs = require('fs');
 
 const sleep = (milliseconds) => {
   return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
 
+var settings = null;
 try {
-  var settings = require('./settings.js');
+  settings = require('./settings.js');
 } catch(e) {
   if (e.code === 'MODULE_NOT_FOUND') {
     console.log('\n\nPlease copy the sample_settings.js to settings.js.');
@@ -50,7 +52,7 @@ var userProjectRe = generateUserProjectRe();
 
 // If no project id is given in settings.js, just return
 // all of the projects that this user is associated with.
-if (settings.gitlab.projectID === null) {
+if (settings.gitlab.projectId === null) {
   listProjects();
 } else {
   // user has chosen a project
@@ -90,14 +92,21 @@ async function listProjects() {
 async function migrate() {
 
   github.authenticate({
-    type: "basic",
-    username: settings.github.username,
-    password: settings.github.token
+    type: "token",
+    token: settings.github.token
   });
 
   //
   // Sequentially transfer repo things
   //
+  
+  if (settings.mergeRequests.log) {
+    // transferring is not worth the effort right now so
+    // log merge requests
+    await logMergeRequests(settings.gitlab.projectId, settings.mergeRequests.logFile);
+  } else {
+    inform("Skipping Merge Requests");
+  }
 
   // transfer GitLab milestones to GitHub
   await transferMilestones(settings.gitlab.projectId);
@@ -267,6 +276,40 @@ async function transferIssues(owner, repo, projectId) {
   };
 
 }
+// ----------------------------------------------------------------------------
+
+/**
+ * logs merge requests that exist in GitLab to a file.
+ */
+async function logMergeRequests(projectId, logFile) {
+  inform("Logging Merge Requests");
+
+  // get a list of all GitLab merge requests associated with this project
+  // TODO return all MRs via pagination
+  let mergeRequests = await gitlab.MergeRequests.all({projectId: projectId});
+
+  // sort MRs in ascending order of when they were created (by id)
+  mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);
+
+  console.log("Logging " + mergeRequests.length.toString() + " merge requests");
+  
+  for (let mergeRequest of mergeRequests) {
+    let mergeRequestDiscussions = await gitlab.MergeRequestDiscussions.all(projectId, mergeRequest.iid);
+    let mergeRequestNotes = await gitlab.MergeRequestNotes.all(projectId, mergeRequest.iid);
+
+    mergeRequest.discussions = mergeRequestDiscussions ? mergeRequestDiscussions : [];
+    mergeRequest.notes = mergeRequestNotes ? mergeRequestNotes : [];
+  }
+
+  //
+  // Log the merge requests to a file
+  //
+  const output = {
+    mergeRequests: mergeRequests
+  };  
+
+  fs.writeFileSync(logFile, JSON.stringify(output, null, 2));
+}
 
 // ----------------------------------------------------------------------------
 
@@ -277,7 +320,7 @@ async function getAllGHMilestones(owner, repo) {
   try {
     await sleep(2000);
     // get an array of GitHub milestones for the new repo
-    let result = await github.issues.getMilestones({owner: owner, repo: repo, state: 'all'});
+    let result = await github.issues.listMilestonesForRepo({owner: owner, repo: repo, state: 'all'});
 
     // extract the milestone number and title and put into a new array
     let milestones = result.data.map(x => ({number: x.number, title: x.title}));
@@ -299,7 +342,7 @@ async function getAllGHLabelNames(owner, repo) {
   try {
     await sleep(2000);
     // get an array of GitHub labels for the new repo
-    let result = await github.issues.getLabels({owner: owner, repo: repo, per_page: 100});
+    let result = await github.issues.listLabelsForRepo({owner: owner, repo: repo});
 
     // extract the label name and put into a new array
     let labels = result.data.map(x => x.name);
@@ -326,7 +369,7 @@ async function getAllGHIssues(owner, repo) {
   while (true) {
     await sleep(2000);
     // get a paginated list of issues
-    const issues = await github.issues.getForRepo({owner: owner, repo: repo, state: 'all', per_page: perPage, page: page });
+    const issues = await github.issues.listForRepo({owner: owner, repo: repo, state: 'all', per_page: perPage, page: page });
 
     // if this page has zero issues then we are done!
     if (issues.data.length === 0)
@@ -345,6 +388,42 @@ async function getAllGHIssues(owner, repo) {
   }
 
   return allIssues;
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Get a list of all the current GitHub issues.
+ * This uses a while loop to make sure that each page of issues is received.
+ */
+async function getAllGHPullRequests(owner, repo) {
+  let allPullRequests = []
+  let page = 1;
+  const perPage = 100;
+
+  const issues = await github.issues.listForRepo({owner: owner, repo: repo, state: 'all', per_page: perPage, page: page });
+
+  while (true) {
+    // get a paginated list of pull requests
+    const pullRequests = await github.pulls.list({owner: owner, repo: repo, state: 'all', per_page: perPage, page: page });
+
+    // if this page has zero PRs then we are done!
+    if (pullRequests.data.length === 0)
+      break;
+
+    // join this list of PRs with the master list
+    allPullRequests = allPullRequests.concat(pullRequests.data);
+
+    // if there are strictly less PRs on this page than the maximum number per page
+    // then we can be sure that this is all the PRs. No use querying again.
+    if (pullRequests.data.length < perPage)
+      break;
+
+    // query for the next page of PRs next iteration
+    page++;
+  }
+
+  return allPullRequests;
 }
 
 // ----------------------------------------------------------------------------
@@ -392,7 +471,7 @@ async function createIssue(owner, repo, milestones, issue) {
       props.assignees.push(settings.github.username);
     } else if (settings.usermap && settings.usermap[issue.assignee.username]) {
       // get GitHub username name from settings
-      props.assignees.push(settings.usermap[item.assignee.username]);
+      props.assignees.push(settings.usermap[issue.assignee.username]);
     }
   }
 
@@ -414,7 +493,13 @@ async function createIssue(owner, repo, milestones, issue) {
 
   // make sure to add any labels that existed in GitLab
   if (issue.labels) {
-    props.labels = issue.labels;
+    props.labels = issue.labels.filter(l => {
+      if (issue.state != 'closed') return true;
+
+      let lower = l.toLowerCase();
+      // ignore any labels that should have been removed when the issue was closed
+      return lower != 'doing' && lower != 'to do';
+    });
   }
 
   //
@@ -427,6 +512,8 @@ async function createIssue(owner, repo, milestones, issue) {
     props.labels.push('has attachment');
   }
   await sleep(2000);
+
+  if (settings.debug) return Promise.resolve({data: issue});
   // create the GitHub issue from the GitLab issue
   return github.issues.create(props);
 }
@@ -449,19 +536,25 @@ async function createIssueComments(ghIssue, issue) {
 
     for (let note of notes) {
 
-      if ((/Status changed to .*/.test(note.body) && !/Status changed to closed by commit.*/.test(note.body)) ||
-          /changed milestone to .*/.test(note.body) ||
-          /Milestone changed to .*/.test(note.body) ||
-          /Reassigned to /.test(note.body) ||
-          /added .* labels/.test(note.body) ||
-          /Added ~.* label/.test(note.body) ||
-          /mentioned in issue.*/.test(note.body)) {
+      if ((/Status changed to .*/i.test(note.body) && !/Status changed to closed by commit.*/i.test(note.body)) ||
+          /changed milestone to .*/i.test(note.body) ||
+          /Milestone changed to .*/i.test(note.body) ||
+          /Reassigned to /i.test(note.body) ||
+          /added .* labels/i.test(note.body) ||
+          /Added ~.* label/i.test(note.body) ||
+          /removed ~.* label/i.test(note.body) ||
+          /mentioned in issue.*/i.test(note.body)) {
         // Don't transfer when the state changed (this is a note in GitLab)
       } else {
 
         let bodyConverted = convertIssuesAndComments(note.body, note);
         
         await sleep(2000);
+
+        if (settings.debug) { 
+          console.log(bodyConverted);
+          return Promise.resolve(); 
+        }
         // process asynchronous code in sequence -- treats kind of like blocking
         await github.issues.createComment({
                     owner: settings.github.owner,
@@ -500,8 +593,12 @@ async function updateIssueState(ghIssue, issue) {
   };
   
   await sleep(2000);
+
+  if (settings.debug) { 
+    return Promise.resolve(); 
+  }
   // make the state update
-  return await github.issues.edit(props);
+  return await github.issues.update(props);
 }
 
 // ----------------------------------------------------------------------------
@@ -524,6 +621,8 @@ async function createMilestone(owner, repo, milestone) {
   }
   
   await sleep(2000);
+
+  if (settings.debug) return Promise.resolve();
   // create the GitHub milestone
   return await github.issues.createMilestone(ghMilestone);
 }
@@ -544,6 +643,7 @@ async function createLabel(owner, repo, label) {
   
   await sleep(2000);
 
+  if (settings.debug) return Promise.resolve();
   // create the GitHub label
   return await github.issues.createLabel(ghLabel);
 }

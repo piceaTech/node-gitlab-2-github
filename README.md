@@ -80,6 +80,14 @@ Go to [Settings / Developer settings / Personal access tokens](https://github.co
 
 What is the name of the new repo
 
+#### debug
+
+As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlabb side to test for wonky cases before using up api-calls
+  
+#### mergeRequests
+
+Object consisting of `logfile` and `log`. Whether to log the merge requests existing in the gitlab repo. Currently there is no code transferring them so they only get logged out.
+
 ### usermap
 
 Maps the usernames from gitlab to github. If the assinee of the gitlab issue is equal to the one currently logged in github it will also get assigned without a usermap. The Mentions in issues will also be translated to the new github name.
