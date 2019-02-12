@@ -21,7 +21,7 @@ module.exports = {
   "conversion": {
     "useLowerCaseLabels": true
   },
-  "debug": true,
+  "debug": false,
   "mergeRequests": {
     "logFile": "./merge-requests.json",
     "log": false
