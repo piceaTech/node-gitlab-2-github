@@ -123,6 +123,82 @@ async function migrate() {
 // ----------------------------------------------------------------------------
 
 /**
+ * Transfer any merge requests that exist in GitLab that do not exist in GitHub
+ */
+async function transferMergeRequests(owner, repo, projectId) {
+  inform("Transferring Merge Requests");
+
+  let milestoneData = await getAllGHMilestones(owner, repo);
+
+  // Get a list of all pull requests (merge request equivalent) associated with 
+  // this project
+  let mergeRequests = await gitlab.MergeRequests.all({projectId: projectId});
+
+  // Sort merge requests in ascending order of when they were created (by id)
+  mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);
+
+  // Get a list of the current pull requests in the new GitHub repo (likely to
+  // be empty)
+  let ghPullRequests = await getAllGHPullRequests(settings.github.owner, settings.github.repo);
+
+  console.log("Transferring " + mergeRequests.length.toString() + " merge requests");
+
+  // 
+  // Create placeholder merge requests
+  //
+
+  // Create placeholder merge requests so that new GitHub pull requests will 
+  // have the same id/number as in GitLab. If a placeholder is used it is because
+  // there was a gap in GitLab merge requests -- likely caused by a deleted
+  // merge request
+  const placeholderItem = {
+    title: 'placeholder pull request for merge request which does not exist and was probably deleted in GitLab',
+    description: 'This is to ensure the pull/merge request numbers in GitLab and GitHub are the same',
+    state: 'closed'
+  }
+
+  for (let i=0; i<mergeRequests.length; i++) {
+    // Gitlab merge request internal Id (iid)
+    let expectedIdx = i+1;
+
+    // is there a gap in the GitLab merge requests?
+    if(mergeRequests[i].iid != expectedIdx){
+      mergeRequests.splice(i, 0, placeholderItem);
+      i++;
+      console.log("Added placeholder pull request for GitLab merge request !" + expectedIdx);
+    }
+  }
+
+  // 
+  // Create GitHub pull request for each GitLab merge request
+  // 
+
+  // if a GitLab merge request does not exist in GitHub repo, create it -- along 
+  // with comments
+  for (let request of mergeRequests) {
+    // Try to find a GitHub pull request that already exists for this GitLab
+    // merge request
+    let ghRequest = ghPullRequests.find(i => i.title.trim() === request.title.trim());
+    if (!ghRequest) {
+      console.log("Creating: " + request.iid + " - " + request.title);
+      try {
+        // process asynchronous code in sequence
+        await createPullRequestAndComments(settings.github.owner,
+          settings.github.repo, milestoneData, request);
+      } catch (err) {
+        console.error("Could not create pull request: " + request.iid + " - " + request.title);
+        console.error(err);
+      }
+    }else{
+      console.log("Already exists: " + request.idd + " - " + request.title);
+      updatePullRequestState(ghRequest, request);
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
+
+/**
  * Transfer any milestones that exist in GitLab that do not exist in GitHub.
  */
 async function transferMilestones(projectId) {
@@ -427,6 +503,30 @@ async function getAllGHPullRequests(owner, repo) {
 }
 
 // ----------------------------------------------------------------------------
+
+async function createPullRequestAndComments(owner, repo, milestones, pullRequest) {
+  let ghPullRequestData = await createPullRequest(owner, repo, milestones, pullRequest);
+  let ghPullRequest = ghPullRequestData.data;
+
+  // add any comments/nodes associated with this pull request
+  await createPullRequestComments(ghPullRequest, pullRequest);
+
+  // Make sure to close the GitHub pull request if it is closed in GitLab
+  await updatePullRequestState(ghPullRequest, pullRequest);
+}
+
+async function createPullRequest(owner, repo, milestones, pullRequest) {
+
+}
+
+async function createPullRequestComments(ghPullRequest, pullRequest) {
+
+}
+
+async function updatePullRequestState(ghPullRequest, pullRequest) {
+
+}
+
 
 /**
  *
