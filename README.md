@@ -25,12 +25,20 @@ git push --no-verify --mirror git@github.com:username/repo.git
 # Set push URL to the mirror location
 git remote set-url --push origin git@github.com:username/repo.git
 
+# Get all branches from GitLab
+git branch -r | grep -v '\->' | while read remote; do git branch --track "${remote#origin/}" "$remote"; done
+git fetch --all
+git pull --all
+
+# Push all branches to GitHub -- required for Merge Request migration
+git push --no-verify --all
+
 # To periodically update the repo on GitHub with what you have in GitLab
 git fetch -p origin
 git push --no-verify --mirror
 ```
 
-After doing this, the autolinking of issues/commits will work. See **Usage** for next steps.
+After doing this, the autolinking of issues, commits, and branches will work. See **Usage** for next steps.
 
 ## Usage
 
