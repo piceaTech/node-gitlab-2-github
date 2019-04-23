@@ -747,14 +747,10 @@ async function updatePullRequestData(ghPullRequest, pullRequest, milestones) {
  */
 async function updatePullRequestState(ghPullRequest, pullRequest) {
 
-  if (pullRequest.state == 'merged' && !settings.debug) {
+  if (pullRequest.state == 'merged' && ghPullRequest.state != 'closed' && !settings.debug) {
 
-    return github.pulls.merge( {
-      commit_title: "",
-      commit_message: "",
-      sha: "",
-      merge_method: ""
-    });
+    // Merging the pull request adds new commits to the tree; to avoid that, just close the merge requests
+    pullRequest.state = 'closed';
   }
 
   // Default state is open so we don't have to update if the request is closed
