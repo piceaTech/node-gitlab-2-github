@@ -100,19 +100,19 @@ async function migrate() {
   // Sequentially transfer repo things
   //
   
-  if (settings.mergeRequests.log) {
-    // transferring is not worth the effort right now so
-    // log merge requests
-    await logMergeRequests(settings.gitlab.projectId, settings.mergeRequests.logFile);
-  } else {
-    inform("Skipping Merge Requests");
-  }
-
   // transfer GitLab milestones to GitHub
   await transferMilestones(settings.gitlab.projectId);
 
   // transfer GitLab labels to GitHub
   await transferLabels(settings.gitlab.projectId, true, settings.conversion.useLowerCaseLabels);
+
+  if (settings.mergeRequests.log) {
+    // transferring is not worth the effort right now so
+    // log merge requests
+    await logMergeRequests(settings.gitlab.projectId, settings.mergeRequests.logFile);
+  } else {
+    await transferMergeRequests(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
+  }
 
   // Transfer issues with their comments
   await transferIssues(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
@@ -515,18 +515,155 @@ async function createPullRequestAndComments(owner, repo, milestones, pullRequest
   await updatePullRequestState(ghPullRequest, pullRequest);
 }
 
-async function createPullRequest(owner, repo, milestones, pullRequest) {
+// ----------------------------------------------------------------------------
 
+async function createPullRequest(owner, repo, milestones, pullRequest) {
+  let bodyConverted = convertIssuesAndComments(pullRequest.description, pullRequest);
+
+  let props = {
+    owner: owner,
+    repo: repo,
+    title: pullRequest.title.trim(),
+    body: bodyConverted,
+    head: pullRequest.sourceBranch,
+    base: pullRequest.targetBranch
+  };
+
+  //
+  // Pull Request Assignee
+  //
+
+  // If the GitLab merge request has an assignee, make sure to carry it over --
+  // but only if the username is a valid GitHub username
+  if (pullRequest.assignee) {
+    props.assignees = [];
+    if (pullRequest.assignee.username == settings.github.username){
+      props.assignees.push(settings.github.username);
+    } else if (settings.usermap && settings.usermap[pullRequest.assignee.username]) {
+      // Get GitHub username from settings
+      props.assignees.push(settings.usermap[pullRequest.assignee.username]);
+    }
+  }
+
+  //
+  // Pull Request Milestone
+  //
+
+  // if the GitLab merge request has an associated milestone, make sure to attach it
+  if (pullRequest.milestone) {
+    let milestone = milestones.find(m => m.title === pullRequest.milestone.title);
+    if (milestone) {
+      props.milestone = milestone.number;
+    }
+  }
+
+  //
+  // Merge Request Labels
+  //
+
+  // make sure to add any labels that existed in GitLab
+  if (pullRequest.labels) {
+    props.labels = pullRequest.labels.filter(l => {
+      if (pullRequest.state != 'closed') return true;
+
+      let lower = l.toLowerCase();
+      // ignore any labels that should have been removed when the issue was closed
+      return lower != 'doing' && lower != 'to do';
+    });
+  }
+
+  //
+  // Merge Request Attachments
+  //
+
+  // if merge request contains a url that contains "/uploads/", it is likely to
+  // have an attachment. Therefore, add the "has attachment" label
+  if (props.body && props.body.indexOf('/uploads/') > -1) {
+    props.labels.push('has attachment');
+  }
+  await sleep(2000);
+
+  if(settings.debug) return Promise.resolve({data: pullRequest});
+  // create the GitHub pull request from the GitLab issue
+  return github.pulls.create(props);
 }
+
+// ----------------------------------------------------------------------------
 
 async function createPullRequestComments(ghPullRequest, pullRequest) {
+  // retrieve any notes/comments associated with this merge request
+  try{
+    let notes = await gitlab.MergeRequestNotes.all(settings.gitlab.projectId, pullRequest.iid);
 
+    // If there are no nodes, then there is nothing to do!
+    if(notes.length == 0) return;
+
+    // Sort notes in ascending order of when they were created (by id)
+    notes = notes.sort((a, b) => a.id - b.id);
+
+    for (let note of notes) {
+      if ((/Status changed to .*/i.test(note.body) && !/Status changed to closed by commit.*/i.test(note.body)) ||
+          /changed milestone to .*/i.test(note.body) ||
+          /Milestone changed to .*/i.test(note.body) ||
+          /Reassigned to /i.test(note.body) ||
+          /added .* labels/i.test(note.body) ||
+          /Added ~.* label/i.test(note.body) ||
+          /removed ~.* label/i.test(note.body) ||
+          /mentioned in issue.*/i.test(note.body)) {
+        // Don't transfer when the state changed (this is a note in GitLab)
+      } else {
+
+        let bodyConverted = convertIssuesAndComments(note.body, note);
+
+        await sleep(2000);
+
+        if (settings.debug) {
+          console.log(bodyConverted);
+          return Promise.resolve();
+        }
+        // process asynchronous code in sequence -- treats kind of like blocking
+        await github.pulls.createComment({
+            owner: settings.github.owner,
+            repo: settings.github.repo,
+            number: ghPullRequest.number,
+            body: bodyConverted
+          }).catch(x=>{
+            console.error("could not create GitHub pull request comment!");
+            console.error(x);
+            process.exit(1);
+          });
+
+      }
+    }
+  } catch (err) {
+    console.error("could not fetch notes for GitLab merge request !" + pullRequest.number);
+    console.error(err);
+  }
 }
+
+// ----------------------------------------------------------------------------
 
 async function updatePullRequestState(ghPullRequest, pullRequest) {
+  // Default state is open so we don't have to update if the request is closed
+  if (pullRequest.state != 'closed' || ghPullRequest.state == 'closed') return;
 
+  let props = {
+    owner: settings.github.owner,
+    repo: settings.github.repo,
+    number: ghPullRequest.number,
+    state: pullRequest.state
+  };
+
+  await sleep(2000);
+
+  if(settings.debug){
+    return Promise.resolve();
+  }
+
+  return await github.pulls.update(props);
 }
 
+// ----------------------------------------------------------------------------
 
 /**
  *
@@ -669,7 +806,7 @@ async function createIssueComments(ghIssue, issue) {
 
       }
 
-    };
+    }
   } catch (err) {
     console.error("Could not fetch notes for GitLab issue #" + issue.number);
     console.error(err);
