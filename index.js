@@ -106,16 +106,15 @@ async function migrate() {
   // transfer GitLab labels to GitHub
   await transferLabels(settings.gitlab.projectId, true, settings.conversion.useLowerCaseLabels);
 
+  // Transfer issues with their comments; do this before transferring the merge requests
+  await transferIssues(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
+
   if (settings.mergeRequests.log) {
-    // transferring is not worth the effort right now so
     // log merge requests
     await logMergeRequests(settings.gitlab.projectId, settings.mergeRequests.logFile);
   } else {
     await transferMergeRequests(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
   }
-
-  // Transfer issues with their comments
-  await transferIssues(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
 
   console.log("\n\nTransfer complete!\n\n");
 }
@@ -144,33 +143,6 @@ async function transferMergeRequests(owner, repo, projectId) {
   console.log("Transferring " + mergeRequests.length.toString() + " merge requests");
 
   // 
-  // Create placeholder merge requests
-  //
-
-  // Create placeholder merge requests so that new GitHub pull requests will 
-  // have the same id/number as in GitLab. If a placeholder is used it is because
-  // there was a gap in GitLab merge requests -- likely caused by a deleted
-  // merge request
-  const placeholderItem = {
-    iid: null,
-    title: 'placeholder pull request for merge request which does not exist and was probably deleted in GitLab',
-    description: 'This is to ensure the pull/merge request numbers in GitLab and GitHub are the same',
-    state: 'closed'
-  }
-
-  for (let i=0; i<mergeRequests.length; i++) {
-    // Gitlab merge request internal Id (iid)
-    let expectedIdx = i+1;
-
-    // is there a gap in the GitLab merge requests?
-    if(mergeRequests[i].iid != expectedIdx){
-      mergeRequests.splice(i, 0, placeholderItem);
-      i++;
-      console.log("Added placeholder pull request for GitLab merge request !" + expectedIdx);
-    }
-  }
-
-  // 
   // Create GitHub pull request for each GitLab merge request
   // 
 
@@ -181,7 +153,7 @@ async function transferMergeRequests(owner, repo, projectId) {
     // merge request
     let ghRequest = ghPullRequests.find(i => i.title.trim() === request.title.trim());
     if (!ghRequest) {
-      console.log("Creating: " + request.iid + " - " + request.title);
+      console.log("Creating pull request: !" + request.iid + " - " + request.title);
       try {
         // process asynchronous code in sequence
         await createPullRequestAndComments(settings.github.owner,
@@ -191,7 +163,7 @@ async function transferMergeRequests(owner, repo, projectId) {
         console.error(err);
       }
     }else{
-      console.log("Already exists: " + request.iid + " - " + request.title);
+      console.log("Pull request already exists: " + request.iid + " - " + request.title);
       updatePullRequestState(ghRequest, request);
     }
   }
@@ -253,6 +225,10 @@ async function transferLabels(projectId, attachmentLabel = true, useLowerCase = 
     const hasAttachmentLabel = {name: 'has attachment', color: '#fbca04'};
     labels.push(hasAttachmentLabel);
   }
+
+  // create gitlabMergeRequest label for non-migratable merge requests
+  const gitlabMergeRequestLabel = {name: 'gitlab merge request', color: '#b36b00'};
+  labels.push(gitlabMergeRequestLabel);
 
   // if a GitLab label does not exist in GitHub repo, create it.
   for (let label of labels) {
@@ -519,13 +495,14 @@ async function createPullRequestAndComments(owner, repo, milestones, pullRequest
 
   // data is set to null if one of the branches does not exist and the pull request cannot be created
   if (ghPullRequest) {
+
     // Add milestones, labels, and other attributes from the Issues API
     await updatePullRequestData(ghPullRequest, pullRequest, milestones);
 
     // add any comments/nodes associated with this pull request
     await createPullRequestComments(ghPullRequest, pullRequest);
 
-    // Make sure to close the GitHub pull request if it is closed in GitLab
+    // Make sure to close the GitHub pull request if it is closed or merged in GitLab
     await updatePullRequestState(ghPullRequest, pullRequest);
   }
 }
@@ -535,15 +512,14 @@ async function createPullRequestAndComments(owner, repo, milestones, pullRequest
 /**
  * Create a pull request. A pull request can only be created if both the target and source branches exist on the GitHub
  * repository. In many cases, the source branch is deleted when the merge occurs, and the merge request may not be able
- * to be migrated.
- * TODO - Can we create an issue to capture the discussion that occurred in the merge request if it cannot be migrated?
+ * to be migrated. In this case, an issue is created instead with a 'gitlab merge request' label.
  * @param owner the owner (user) of the GitHub repository
  * @param repo the name of the GitHub repository
  * @param pullRequest the GitLab pull request object that we want to duplicate
  * @returns {Promise<Promise<{data: null}>|Promise<Github.Response<Github.PullsCreateResponse>>|Promise<{data: *}>>}
  */
 async function createPullRequest(owner, repo, pullRequest) {
-  let bodyConverted = convertIssuesAndComments(pullRequest.description, pullRequest);
+  let canCreate = true;
 
   // Check to see if the target branch exists in GitHub - if it does not exist, we cannot create a pull request
   try {
@@ -560,11 +536,13 @@ async function createPullRequest(owner, repo, pullRequest) {
       // Need to move that branch over to GitHub!
       console.error("The " + pullRequest.target_branch + " branch exists on GitLab but has not been migrated to GitHub." +
         " Please migrate the branch before migrating merge request !" + pullRequest.iid);
+      return Promise.resolve({data: null});
     }else{
       console.error("Merge request !" + pullRequest.iid + ", target branch: " + pullRequest.target_branch + " does not exist");
-      console.error("Thus, cannot migrate merge request");
+      console.error("Thus, cannot migrate merge request; creating an issue instead");
+      canCreate = false;
     }
-    return Promise.resolve({data: null});
+
   }
 
   // Check to see if the source branch exists in GitHub - if it does not exist, we cannot create a pull request
@@ -581,31 +559,49 @@ async function createPullRequest(owner, repo, pullRequest) {
       // Need to move that branch over to GitHub!
       console.error("The " + pullRequest.source_branch + " branch exists on GitLab but has not been migrated to GitHub." +
           " Please migrate the branch before migrating merge request !" + pullRequest.iid);
+      return Promise.resolve({data: null});
     }else{
       console.error("Merge request !" + pullRequest.iid + ", source branch: " + pullRequest.source_branch + " does not exist");
-      console.error("Thus, cannot migrate merge request");
+      console.error("Thus, cannot migrate merge request; creating an issue instead");
+      canCreate = false;
     }
-    return Promise.resolve({data: null});
   }
-
-  // TODO - If the merge request cannot be created because one of the branches is missing, should we create it as an issue?
-
-  // GitHub API Documentation to create a pull request: https://developer.github.com/v3/pulls/#create-a-pull-request
-  let props = {
-    owner: owner,
-    repo: repo,
-    title: pullRequest.title.trim(),
-    body: bodyConverted,
-    head: pullRequest.source_branch,
-    base: pullRequest.target_branch
-  };
-
-  await sleep(2000);
 
   if(settings.debug) return Promise.resolve({data: pullRequest});
 
-  // create the GitHub pull request from the GitLab issue
-  return github.pulls.create(props);
+  if(canCreate) {
+    let bodyConverted = convertIssuesAndComments(pullRequest.description, pullRequest);
+
+    // GitHub API Documentation to create a pull request: https://developer.github.com/v3/pulls/#create-a-pull-request
+    let props = {
+      owner: owner,
+      repo: repo,
+      title: pullRequest.title.trim(),
+      body: bodyConverted,
+      head: pullRequest.source_branch,
+      base: pullRequest.target_branch
+    };
+
+    await sleep(2000);
+
+    // create the GitHub pull request from the GitLab issue
+    return github.pulls.create(props);
+  } else {
+    // Create an issue with a descriptive title
+    let mergeStr = "_Merges " + pullRequest.source_branch + " -> " + pullRequest.target_branch + "_\n\n";
+    let bodyConverted = convertIssuesAndComments(mergeStr + pullRequest.description, pullRequest);
+    let props = {
+      owner: owner,
+      repo: repo,
+      title: pullRequest.title.trim() + " - [" + pullRequest.state + "]",
+      body: bodyConverted
+    };
+
+    // Add a label to indicate the issue is a merge request
+    pullRequest.labels.push('gitlab merge request');
+
+    return github.issues.create(props);
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -770,7 +766,9 @@ async function updatePullRequestState(ghPullRequest, pullRequest) {
     return Promise.resolve();
   }
 
-  return await github.pulls.update(props);
+  // Use the Issues API; all pull requests are issues, and we're not modifying any pull request-sepecific fields. This
+  // then works for merge requests that cannot be created and are migrated as issues.
+  return await github.issues.update(props);
 }
 
 // ----------------------------------------------------------------------------
