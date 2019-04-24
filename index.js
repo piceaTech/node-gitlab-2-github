@@ -123,6 +123,12 @@ async function migrate() {
 
 /**
  * Transfer any merge requests that exist in GitLab that do not exist in GitHub
+ * TODO - Update all text references to use the new issue numbers;
+ *        GitHub treats pull requests as issues, therefore their numbers are changed
+ * @param owner the owner of the GitHub repository
+ * @param repo the name of the GitHub repository
+ * @param projectId the Id of the GitLab repository that is being transferred
+ * @returns {Promise<void>}
  */
 async function transferMergeRequests(owner, repo, projectId) {
   inform("Transferring Merge Requests");
