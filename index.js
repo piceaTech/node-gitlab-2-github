@@ -233,6 +233,7 @@ async function transferIssues(owner, repo, projectId) {
   // issue number as in GitLab. If a placeholder is used it is because there
   // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
   const placeholderItem = {
+    iid: null,
     title: 'placeholder issue for issue which does not exist and was probably deleted in GitLab',
     description: 'This is to ensure the issue numbers in GitLab and GitHub are the same',
     state: 'closed'
@@ -525,6 +526,11 @@ async function createIssue(owner, repo, milestones, issue) {
  */
 async function createIssueComments(ghIssue, issue) {
   // retrieve any notes/comments associated with this issue
+  if ( !(issue.iid) ) {
+    console.log("Placeholder issue; no comments are migrated.");
+    return;
+  }
+
   try {
     let notes = await gitlab.IssueNotes.all(settings.gitlab.projectId, issue.iid);
 
