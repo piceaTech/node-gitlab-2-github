@@ -25,14 +25,6 @@ git push --no-verify --mirror git@github.com:username/repo.git
 # Set push URL to the mirror location
 git remote set-url --push origin git@github.com:username/repo.git
 
-# Get all branches from GitLab
-git branch -r | grep -v '\->' | while read remote; do git branch --track "${remote#origin/}" "$remote"; done
-git fetch --all
-git pull --all
-
-# Push all branches to GitHub -- required for Merge Request migration
-git push --no-verify --all
-
 # To periodically update the repo on GitHub with what you have in GitLab
 git fetch -p origin
 git push --no-verify --mirror
@@ -94,7 +86,7 @@ As default it is set to false. Doesn't fire the requests to github api and only 
   
 #### mergeRequests
 
-Object consisting of `logfile` and `log`. Whether to log the merge requests existing in the gitlab repo. Currently there is no code transferring them so they only get logged out.
+Object consisting of `logfile` and `log`. If `log` is set to true, then the merge requests are logged in the specified file and not migrated. Conversely, if `log` is set to false, then the merge requests are migrated to GitHub and not logged. If the source or target branches linked to the merge request have been deleted, the merge request cannot be migrated to a pull request; instead, an issue with a custom "gitlab merge request" tag is created with the full comment history of the merge request.
 
 ### usermap
 
