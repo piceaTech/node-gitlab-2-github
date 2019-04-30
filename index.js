@@ -122,62 +122,6 @@ async function migrate() {
 // ----------------------------------------------------------------------------
 
 /**
- * Transfer any merge requests that exist in GitLab that do not exist in GitHub
- * TODO - Update all text references to use the new issue numbers;
- *        GitHub treats pull requests as issues, therefore their numbers are changed
- * @param owner the owner of the GitHub repository
- * @param repo the name of the GitHub repository
- * @param projectId the Id of the GitLab repository that is being transferred
- * @returns {Promise<void>}
- */
-async function transferMergeRequests(owner, repo, projectId) {
-  inform("Transferring Merge Requests");
-
-  let milestoneData = await getAllGHMilestones(owner, repo);
-
-  // Get a list of all pull requests (merge request equivalent) associated with 
-  // this project
-  let mergeRequests = await gitlab.MergeRequests.all({projectId: projectId});
-
-  // Sort merge requests in ascending order of when they were created (by id)
-  mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);
-
-  // Get a list of the current pull requests in the new GitHub repo (likely to
-  // be empty)
-  let ghPullRequests = await getAllGHPullRequests(settings.github.owner, settings.github.repo);
-
-  console.log("Transferring " + mergeRequests.length.toString() + " merge requests");
-
-  // 
-  // Create GitHub pull request for each GitLab merge request
-  // 
-
-  // if a GitLab merge request does not exist in GitHub repo, create it -- along 
-  // with comments
-  for (let request of mergeRequests) {
-    // Try to find a GitHub pull request that already exists for this GitLab
-    // merge request
-    let ghRequest = ghPullRequests.find(i => i.title.trim() === request.title.trim());
-    if (!ghRequest) {
-      console.log("Creating pull request: !" + request.iid + " - " + request.title);
-      try {
-        // process asynchronous code in sequence
-        await createPullRequestAndComments(settings.github.owner,
-          settings.github.repo, milestoneData, request);
-      } catch (err) {
-        console.error("Could not create pull request: !" + request.iid + " - " + request.title);
-        console.error(err);
-      }
-    }else{
-      console.log("Pull request already exists: " + request.iid + " - " + request.title);
-      updatePullRequestState(ghRequest, request);
-    }
-  }
-}
-
-//-----------------------------------------------------------------------------
-
-/**
  * Transfer any milestones that exist in GitLab that do not exist in GitHub.
  */
 async function transferMilestones(projectId) {
@@ -276,8 +220,8 @@ async function transferIssues(owner, repo, projectId) {
   // TODO return all issues via pagination
   let issues = await gitlab.Issues.all({projectId: projectId});
 
-  // sort issues in ascending order of when they were created (by id)
-  issues = issues.sort((a, b) => a.id - b.id);
+  // sort issues in ascending order of their issue number (by iid)
+  issues = issues.sort((a, b) => a.iid - b.iid);
 
   // get a list of the current issues in the new GitHub repo (likely to be empty)
   let ghIssues = await getAllGHIssues(settings.github.owner, settings.github.repo);
@@ -337,6 +281,62 @@ async function transferIssues(owner, repo, projectId) {
 
 }
 // ----------------------------------------------------------------------------
+
+/**
+ * Transfer any merge requests that exist in GitLab that do not exist in GitHub
+ * TODO - Update all text references to use the new issue numbers;
+ *        GitHub treats pull requests as issues, therefore their numbers are changed
+ * @param owner the owner of the GitHub repository
+ * @param repo the name of the GitHub repository
+ * @param projectId the Id of the GitLab repository that is being transferred
+ * @returns {Promise<void>}
+ */
+async function transferMergeRequests(owner, repo, projectId) {
+  inform("Transferring Merge Requests");
+
+  let milestoneData = await getAllGHMilestones(owner, repo);
+
+  // Get a list of all pull requests (merge request equivalent) associated with
+  // this project
+  let mergeRequests = await gitlab.MergeRequests.all({projectId: projectId});
+
+  // Sort merge requests in ascending order of their number (by iid)
+  mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
+
+  // Get a list of the current pull requests in the new GitHub repo (likely to
+  // be empty)
+  let ghPullRequests = await getAllGHPullRequests(settings.github.owner, settings.github.repo);
+
+  console.log("Transferring " + mergeRequests.length.toString() + " merge requests");
+
+  //
+  // Create GitHub pull request for each GitLab merge request
+  //
+
+  // if a GitLab merge request does not exist in GitHub repo, create it -- along
+  // with comments
+  for (let request of mergeRequests) {
+    // Try to find a GitHub pull request that already exists for this GitLab
+    // merge request
+    let ghRequest = ghPullRequests.find(i => i.title.trim() === request.title.trim());
+    if (!ghRequest) {
+      console.log("Creating pull request: !" + request.iid + " - " + request.title);
+      try {
+        // process asynchronous code in sequence
+        await createPullRequestAndComments(settings.github.owner,
+          settings.github.repo, milestoneData, request);
+      } catch (err) {
+        console.error("Could not create pull request: !" + request.iid + " - " + request.title);
+        console.error(err);
+      }
+    }else{
+      console.log("Pull request already exists: " + request.iid + " - " + request.title);
+      updatePullRequestState(ghRequest, request);
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
 
 /**
  * logs merge requests that exist in GitLab to a file.
