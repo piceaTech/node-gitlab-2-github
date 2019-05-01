@@ -100,22 +100,21 @@ async function migrate() {
   // Sequentially transfer repo things
   //
   
-  if (settings.mergeRequests.log) {
-    // transferring is not worth the effort right now so
-    // log merge requests
-    await logMergeRequests(settings.gitlab.projectId, settings.mergeRequests.logFile);
-  } else {
-    inform("Skipping Merge Requests");
-  }
-
   // transfer GitLab milestones to GitHub
   await transferMilestones(settings.gitlab.projectId);
 
   // transfer GitLab labels to GitHub
   await transferLabels(settings.gitlab.projectId, true, settings.conversion.useLowerCaseLabels);
 
-  // Transfer issues with their comments
+  // Transfer issues with their comments; do this before transferring the merge requests
   await transferIssues(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
+
+  if (settings.mergeRequests.log) {
+    // log merge requests
+    await logMergeRequests(settings.gitlab.projectId, settings.mergeRequests.logFile);
+  } else {
+    await transferMergeRequests(settings.github.owner, settings.github.repo, settings.gitlab.projectId);
+  }
 
   console.log("\n\nTransfer complete!\n\n");
 }
@@ -177,6 +176,10 @@ async function transferLabels(projectId, attachmentLabel = true, useLowerCase = 
     labels.push(hasAttachmentLabel);
   }
 
+  // create gitlabMergeRequest label for non-migratable merge requests
+  const gitlabMergeRequestLabel = {name: 'gitlab merge request', color: '#b36b00'};
+  labels.push(gitlabMergeRequestLabel);
+
   // if a GitLab label does not exist in GitHub repo, create it.
   for (let label of labels) {
 
@@ -217,8 +220,8 @@ async function transferIssues(owner, repo, projectId) {
   // TODO return all issues via pagination
   let issues = await gitlab.Issues.all({projectId: projectId});
 
-  // sort issues in ascending order of when they were created (by id)
-  issues = issues.sort((a, b) => a.id - b.id);
+  // sort issues in ascending order of their issue number (by iid)
+  issues = issues.sort((a, b) => a.iid - b.iid);
 
   // get a list of the current issues in the new GitHub repo (likely to be empty)
   let ghIssues = await getAllGHIssues(settings.github.owner, settings.github.repo);
@@ -278,6 +281,62 @@ async function transferIssues(owner, repo, projectId) {
 
 }
 // ----------------------------------------------------------------------------
+
+/**
+ * Transfer any merge requests that exist in GitLab that do not exist in GitHub
+ * TODO - Update all text references to use the new issue numbers;
+ *        GitHub treats pull requests as issues, therefore their numbers are changed
+ * @param owner the owner of the GitHub repository
+ * @param repo the name of the GitHub repository
+ * @param projectId the Id of the GitLab repository that is being transferred
+ * @returns {Promise<void>}
+ */
+async function transferMergeRequests(owner, repo, projectId) {
+  inform("Transferring Merge Requests");
+
+  let milestoneData = await getAllGHMilestones(owner, repo);
+
+  // Get a list of all pull requests (merge request equivalent) associated with
+  // this project
+  let mergeRequests = await gitlab.MergeRequests.all({projectId: projectId});
+
+  // Sort merge requests in ascending order of their number (by iid)
+  mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
+
+  // Get a list of the current pull requests in the new GitHub repo (likely to
+  // be empty)
+  let ghPullRequests = await getAllGHPullRequests(settings.github.owner, settings.github.repo);
+
+  console.log("Transferring " + mergeRequests.length.toString() + " merge requests");
+
+  //
+  // Create GitHub pull request for each GitLab merge request
+  //
+
+  // if a GitLab merge request does not exist in GitHub repo, create it -- along
+  // with comments
+  for (let request of mergeRequests) {
+    // Try to find a GitHub pull request that already exists for this GitLab
+    // merge request
+    let ghRequest = ghPullRequests.find(i => i.title.trim() === request.title.trim());
+    if (!ghRequest) {
+      console.log("Creating pull request: !" + request.iid + " - " + request.title);
+      try {
+        // process asynchronous code in sequence
+        await createPullRequestAndComments(settings.github.owner,
+          settings.github.repo, milestoneData, request);
+      } catch (err) {
+        console.error("Could not create pull request: !" + request.iid + " - " + request.title);
+        console.error(err);
+      }
+    }else{
+      console.log("Pull request already exists: " + request.iid + " - " + request.title);
+      updatePullRequestState(ghRequest, request);
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
 
 /**
  * logs merge requests that exist in GitLab to a file.
@@ -394,7 +453,7 @@ async function getAllGHIssues(owner, repo) {
 // ----------------------------------------------------------------------------
 
 /**
- * Get a list of all the current GitHub issues.
+ * Get a list of all the current GitHub pull requests.
  * This uses a while loop to make sure that each page of issues is received.
  */
 async function getAllGHPullRequests(owner, repo) {
@@ -402,9 +461,8 @@ async function getAllGHPullRequests(owner, repo) {
   let page = 1;
   const perPage = 100;
 
-  const issues = await github.issues.listForRepo({owner: owner, repo: repo, state: 'all', per_page: perPage, page: page });
-
   while (true) {
+    await sleep(2000);
     // get a paginated list of pull requests
     const pullRequests = await github.pulls.list({owner: owner, repo: repo, state: 'all', per_page: perPage, page: page });
 
@@ -425,6 +483,298 @@ async function getAllGHPullRequests(owner, repo) {
   }
 
   return allPullRequests;
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Create a pull request, set its data, and set its comments
+ * @param owner the GitHub repository owner (user)
+ * @param repo the GitHub repository name
+ * @param milestones a list of the milestones that exist in the GitHub repository
+ * @param pullRequest the GitLab pull request that we want to migrate
+ * @returns {Promise<void>}
+ */
+async function createPullRequestAndComments(owner, repo, milestones, pullRequest) {
+  let ghPullRequestData = await createPullRequest(owner, repo, pullRequest);
+  let ghPullRequest = ghPullRequestData.data;
+
+  // data is set to null if one of the branches does not exist and the pull request cannot be created
+  if (ghPullRequest) {
+
+    // Add milestones, labels, and other attributes from the Issues API
+    await updatePullRequestData(ghPullRequest, pullRequest, milestones);
+
+    // add any comments/nodes associated with this pull request
+    await createPullRequestComments(ghPullRequest, pullRequest);
+
+    // Make sure to close the GitHub pull request if it is closed or merged in GitLab
+    await updatePullRequestState(ghPullRequest, pullRequest);
+  }
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Create a pull request. A pull request can only be created if both the target and source branches exist on the GitHub
+ * repository. In many cases, the source branch is deleted when the merge occurs, and the merge request may not be able
+ * to be migrated. In this case, an issue is created instead with a 'gitlab merge request' label.
+ * @param owner the owner (user) of the GitHub repository
+ * @param repo the name of the GitHub repository
+ * @param pullRequest the GitLab pull request object that we want to duplicate
+ * @returns {Promise<Promise<{data: null}>|Promise<Github.Response<Github.PullsCreateResponse>>|Promise<{data: *}>>}
+ */
+async function createPullRequest(owner, repo, pullRequest) {
+  let canCreate = true;
+
+  // Check to see if the target branch exists in GitHub - if it does not exist, we cannot create a pull request
+  try {
+    await github.repos.getBranch({
+      owner: owner,
+      repo: repo,
+      branch: pullRequest.target_branch
+    });
+
+  } catch (err) {
+
+    let glBranches = await gitlab.Branches.all(settings.gitlab.projectId);
+    if(glBranches.find(m => m.name === pullRequest.target_branch)){
+      // Need to move that branch over to GitHub!
+      console.error("The " + pullRequest.target_branch + " branch exists on GitLab but has not been migrated to GitHub." +
+        " Please migrate the branch before migrating merge request !" + pullRequest.iid);
+      return Promise.resolve({data: null});
+    }else{
+      console.error("Merge request !" + pullRequest.iid + ", target branch: " + pullRequest.target_branch + " does not exist");
+      console.error("Thus, cannot migrate merge request; creating an issue instead");
+      canCreate = false;
+    }
+
+  }
+
+  // Check to see if the source branch exists in GitHub - if it does not exist, we cannot create a pull request
+  try {
+    await github.repos.getBranch({
+      owner: owner,
+      repo: repo,
+      branch: pullRequest.source_branch
+    });
+  } catch (err) {
+
+    let glBranches = await gitlab.Branches.all(settings.gitlab.projectId);
+    if(glBranches.find(m => m.name === pullRequest.source_branch)){
+      // Need to move that branch over to GitHub!
+      console.error("The " + pullRequest.source_branch + " branch exists on GitLab but has not been migrated to GitHub." +
+          " Please migrate the branch before migrating merge request !" + pullRequest.iid);
+      return Promise.resolve({data: null});
+    }else{
+      console.error("Merge request !" + pullRequest.iid + ", source branch: " + pullRequest.source_branch + " does not exist");
+      console.error("Thus, cannot migrate merge request; creating an issue instead");
+      canCreate = false;
+    }
+  }
+
+  if(settings.debug) return Promise.resolve({data: pullRequest});
+
+  if(canCreate) {
+    let bodyConverted = convertIssuesAndComments(pullRequest.description, pullRequest);
+
+    // GitHub API Documentation to create a pull request: https://developer.github.com/v3/pulls/#create-a-pull-request
+    let props = {
+      owner: owner,
+      repo: repo,
+      title: pullRequest.title.trim(),
+      body: bodyConverted,
+      head: pullRequest.source_branch,
+      base: pullRequest.target_branch
+    };
+
+    await sleep(2000);
+
+    // create the GitHub pull request from the GitLab issue
+    return github.pulls.create(props);
+  } else {
+    // Create an issue with a descriptive title
+    let mergeStr = "_Merges " + pullRequest.source_branch + " -> " + pullRequest.target_branch + "_\n\n";
+    let bodyConverted = convertIssuesAndComments(mergeStr + pullRequest.description, pullRequest);
+    let props = {
+      owner: owner,
+      repo: repo,
+      title: pullRequest.title.trim() + " - [" + pullRequest.state + "]",
+      body: bodyConverted
+    };
+
+    // Add a label to indicate the issue is a merge request
+    pullRequest.labels.push('gitlab merge request');
+
+    return github.issues.create(props);
+  }
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Create comments for the pull request
+ * @param ghPullRequest the GitHub pull request object
+ * @param pullRequest the GitLab pull request object
+ * @returns {Promise<void>}
+ */
+async function createPullRequestComments(ghPullRequest, pullRequest) {
+
+  if ( !(pullRequest.iid) ){
+    console.log("This is a placeholder for a deleted GitLab merge request; no comments are created");
+    return Promise.resolve();
+  }
+
+  // retrieve any notes/comments associated with this merge request
+  try{
+    let notes = await gitlab.MergeRequestNotes.all(settings.gitlab.projectId, pullRequest.iid);
+
+    // If there are no nodes, then there is nothing to do!
+    if(notes.length == 0) return;
+
+    // Sort notes in ascending order of when they were created (by id)
+    notes = notes.sort((a, b) => a.id - b.id);
+
+    for (let note of notes) {
+      if ((/Status changed to .*/i.test(note.body) && !/Status changed to closed by commit.*/i.test(note.body)) ||
+          /changed milestone to .*/i.test(note.body) ||
+          /Milestone changed to .*/i.test(note.body) ||
+          /Reassigned to /i.test(note.body) ||
+          /added .* labels/i.test(note.body) ||
+          /Added ~.* label/i.test(note.body) ||
+          /removed ~.* label/i.test(note.body) ||
+          /mentioned in issue.*/i.test(note.body)) {
+        // Don't transfer when the state changed (this is a note in GitLab)
+      } else {
+
+        let bodyConverted = convertIssuesAndComments(note.body, note);
+
+        await sleep(2000);
+
+        if (settings.debug) {
+          console.log(bodyConverted);
+          return Promise.resolve();
+        }
+        // Use the GitHub Issues API to create comments (all pull requests are issues); Pull request comments are more
+        // specialized: see <https://developer.github.com/v3/pulls/comments/>
+        await github.issues.createComment({
+            owner: settings.github.owner,
+            repo: settings.github.repo,
+            number: ghPullRequest.number,
+            body: bodyConverted
+          }).catch(x=>{
+            console.error("could not create GitHub pull request comment!");
+            console.error(x);
+            process.exit(1);
+          });
+
+      }
+    }
+  } catch (err) {
+    console.error("could not fetch notes for GitLab merge request !" + pullRequest.iid);
+    console.error(err);
+  }
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Update the pull request data. The GitHub Pull Request API does not supply mechanisms to set the milestone, assignee,
+ * or labels; these data are set via the Issues API in this function
+ * @param ghPullRequest the GitHub pull request object
+ * @param pullRequest the GitLab pull request object
+ * @param milestones a list of Milestones that exist in the GitHub repo
+ * @returns {Promise<Github.Response<Github.IssuesUpdateResponse>>}
+ */
+async function updatePullRequestData(ghPullRequest, pullRequest, milestones) {
+
+  let props = {
+    owner: settings.github.owner,
+    repo: settings.github.repo,
+    number: ghPullRequest.number
+  };
+
+  //
+  // Pull Request Assignee
+  //
+
+  // If the GitLab merge request has an assignee, make sure to carry it over --
+  // but only if the username is a valid GitHub username
+  if (pullRequest.assignee) {
+    props.assignees = [];
+    if (pullRequest.assignee.username == settings.github.username){
+      props.assignees.push(settings.github.username);
+    } else if (settings.usermap && settings.usermap[pullRequest.assignee.username]) {
+      // Get GitHub username from settings
+      props.assignees.push(settings.usermap[pullRequest.assignee.username]);
+    }
+  }
+
+  //
+  // Pull Request Milestone
+  //
+
+  // if the GitLab merge request has an associated milestone, make sure to attach it
+  if (pullRequest.milestone) {
+    let milestone = milestones.find(m => m.title === pullRequest.milestone.title);
+    if (milestone) {
+      props.milestone = milestone.number;
+    }
+  }
+
+  //
+  // Merge Request Labels
+  //
+
+  // make sure to add any labels that existed in GitLab
+  if (pullRequest.labels) {
+    props.labels = pullRequest.labels.filter(l => {
+      if (pullRequest.state != 'closed') return true;
+
+      let lower = l.toLowerCase();
+      // ignore any labels that should have been removed when the issue was closed
+      return lower != 'doing' && lower != 'to do';
+    });
+  }
+
+  return await github.issues.update(props);
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Update the pull request state
+ * @param ghPullRequest GitHub pull request object
+ * @param pullRequest GitLab pull request object
+ * @returns {Promise<Promise<Github.AnyResponse>|Github.Response<Github.PullsUpdateResponse>|Promise<void>>}
+ */
+async function updatePullRequestState(ghPullRequest, pullRequest) {
+
+  if (pullRequest.state == 'merged' && ghPullRequest.state != 'closed' && !settings.debug) {
+
+    // Merging the pull request adds new commits to the tree; to avoid that, just close the merge requests
+    pullRequest.state = 'closed';
+  }
+
+  // Default state is open so we don't have to update if the request is closed
+  if (pullRequest.state != 'closed' || ghPullRequest.state == 'closed') return;
+
+  let props = {
+    owner: settings.github.owner,
+    repo: settings.github.repo,
+    number: ghPullRequest.number,
+    state: pullRequest.state
+  };
+
+  await sleep(2000);
+
+  if(settings.debug){
+    return Promise.resolve();
+  }
+
+  // Use the Issues API; all pull requests are issues, and we're not modifying any pull request-sepecific fields. This
+  // then works for merge requests that cannot be created and are migrated as issues.
+  return await github.issues.update(props);
 }
 
 // ----------------------------------------------------------------------------
@@ -575,7 +925,7 @@ async function createIssueComments(ghIssue, issue) {
 
       }
 
-    };
+    }
   } catch (err) {
     console.error("Could not fetch notes for GitLab issue #" + issue.number);
     console.error(err);
