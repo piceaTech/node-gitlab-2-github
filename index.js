@@ -16,7 +16,7 @@ try {
   } else {
     console.log(e);
   }
-  
+
   process.exit(1);
 }
 
@@ -99,7 +99,7 @@ async function migrate() {
   //
   // Sequentially transfer repo things
   //
-  
+
   // transfer GitLab milestones to GitHub
   await transferMilestones(settings.gitlab.projectId);
 
@@ -213,9 +213,9 @@ async function transferLabels(projectId, attachmentLabel = true, useLowerCase = 
 async function transferIssues(owner, repo, projectId) {
   inform("Transferring Issues");
 
-  // Because each 
+  // Because each
   let milestoneData = await getAllGHMilestones(owner, repo);
-  
+
   // get a list of all GitLab issues associated with this project
   // TODO return all issues via pagination
   let issues = await gitlab.Issues.all({projectId: projectId});
@@ -232,23 +232,21 @@ async function transferIssues(owner, repo, projectId) {
   // Create Placeholder Issues
   //
 
-  // Create placeholder issues so that new GitHub issues will have the same
-  // issue number as in GitLab. If a placeholder is used it is because there
-  // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
-  const placeholderItem = {
-    iid: null,
-    title: 'placeholder issue for issue which does not exist and was probably deleted in GitLab',
-    description: 'This is to ensure the issue numbers in GitLab and GitHub are the same',
-    state: 'closed'
-  }
-
   for (let i=0; i<issues.length; i++) {
     // GitLab issue internal Id (iid)
     let expectedIdx = i+1;
 
     // is there a gap in the GitLab issues?
+    // Create placeholder issues so that new GitHub issues will have the same
+    // issue number as in GitLab. If a placeholder is used it is because there
+    // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
     if (issues[i].iid != expectedIdx) {
-      issues.splice(i, 0, placeholderItem);
+      issues.splice(i, 0, {
+        iid: expectedIdx,
+        title: `placeholder issue for issue ${expectedIdx} which does not exist and was probably deleted in GitLab`,
+        description: 'This is to ensure the issue numbers in GitLab and GitHub are the same',
+        state: 'closed'
+      });
       i++;
       console.log("Added placeholder issue for GitLab issue #" + expectedIdx)
     }
@@ -352,7 +350,7 @@ async function logMergeRequests(projectId, logFile) {
   mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);
 
   console.log("Logging " + mergeRequests.length.toString() + " merge requests");
-  
+
   for (let mergeRequest of mergeRequests) {
     let mergeRequestDiscussions = await gitlab.MergeRequestDiscussions.all(projectId, mergeRequest.iid);
     let mergeRequestNotes = await gitlab.MergeRequestNotes.all(projectId, mergeRequest.iid);
@@ -366,7 +364,7 @@ async function logMergeRequests(projectId, logFile) {
   //
   const output = {
     mergeRequests: mergeRequests
-  };  
+  };
 
   fs.writeFileSync(logFile, JSON.stringify(output, null, 2));
 }
@@ -904,12 +902,12 @@ async function createIssueComments(ghIssue, issue) {
       } else {
 
         let bodyConverted = convertIssuesAndComments(note.body, note);
-        
+
         await sleep(2000);
 
-        if (settings.debug) { 
+        if (settings.debug) {
           console.log(bodyConverted);
-          return Promise.resolve(); 
+          return Promise.resolve();
         }
         // process asynchronous code in sequence -- treats kind of like blocking
         await github.issues.createComment({
@@ -947,11 +945,11 @@ async function updateIssueState(ghIssue, issue) {
     number: ghIssue.number,
     state: issue.state
   };
-  
+
   await sleep(2000);
 
-  if (settings.debug) { 
-    return Promise.resolve(); 
+  if (settings.debug) {
+    return Promise.resolve();
   }
   // make the state update
   return await github.issues.update(props);
@@ -975,7 +973,7 @@ async function createMilestone(owner, repo, milestone) {
   if (milestone.due_date) {
     ghMilestone.due_on = milestone.due_date + 'T00:00:00Z';
   }
-  
+
   await sleep(2000);
 
   if (settings.debug) return Promise.resolve();
@@ -996,7 +994,7 @@ async function createLabel(owner, repo, label) {
     name: label.name,
     color: label.color.substr(1) // remove leading "#" because gitlab returns it but github wants the color without it
   };
-  
+
   await sleep(2000);
 
   if (settings.debug) return Promise.resolve();
