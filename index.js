@@ -689,7 +689,7 @@ async function updatePullRequestData(ghPullRequest, pullRequest, milestones) {
   let props = {
     owner: settings.github.owner,
     repo: settings.github.repo,
-    number: ghPullRequest.iid
+    number: ghPullRequest.number || ghPullRequest.iid
   };
 
   //
