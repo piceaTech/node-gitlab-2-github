@@ -19,7 +19,7 @@ git clone --mirror git@your-gitlab-site.com:username/repo.git
 # Change into newly created repo directory
 cd repo
 
-# Push to GitHub using the `--mirror` option.  The `--no-verify` option skips any hooks. 
+# Push to GitHub using the `--mirror` option.  The `--no-verify` option skips any hooks.
 git push --no-verify --mirror git@github.com:username/repo.git
 
 # Set push URL to the mirror location
@@ -40,9 +40,7 @@ The user must be a member of the project you want to copy or else you won't see 
 1. edit settings.js
 1. run `node index.js`
 
-
 ## Where to find info for the `settings.js`
-
 
 ### gitlab
 
@@ -83,7 +81,7 @@ What is the name of the new repo
 #### debug
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlabb side to test for wonky cases before using up api-calls
-  
+
 #### mergeRequests
 
 Object consisting of `logfile` and `log`. If `log` is set to true, then the merge requests are logged in the specified file and not migrated. Conversely, if `log` is set to false, then the merge requests are migrated to GitHub and not logged. If the source or target branches linked to the merge request have been deleted, the merge request cannot be migrated to a pull request; instead, an issue with a custom "gitlab merge request" tag is created with the full comment history of the merge request.
@@ -95,7 +93,6 @@ Maps the usernames from gitlab to github. If the assinee of the gitlab issue is 
 ### projectmap
 
 When one renames the project while transfering so that the projects don't loose there links to the mentioned issues.
-
 
 ## Import limit
 
