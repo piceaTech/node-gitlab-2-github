@@ -297,7 +297,6 @@ async function transferIssues(owner, repo, projectId) {
           'This is to ensure the issue numbers in GitLab and GitHub are the same',
         state: 'closed',
       });
-      i++;
       console.log('Added placeholder issue for GitLab issue #' + expectedIdx);
     }
   }
