@@ -38,7 +38,7 @@ The user must be a member of the project you want to copy or else you won't see 
 
 1. `cp sample_settings.js settings.js`
 1. edit settings.js
-1. run `node index.js`
+1. run `npm run start`
 
 ## Where to find info for the `settings.js`
 
