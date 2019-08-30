@@ -178,7 +178,7 @@ export default class GithubHelper {
     // if the username is a valid GitHub username.
     if (issue.assignee) {
       props.assignees = [];
-      if (issue.assignee.username == settings.github.username) {
+      if (issue.assignee.username === settings.github.username) {
         props.assignees.push(settings.github.username);
       } else if (
         settings.usermap &&
@@ -208,11 +208,11 @@ export default class GithubHelper {
     // make sure to add any labels that existed in GitLab
     if (issue.labels) {
       props.labels = issue.labels.filter(l => {
-        if (issue.state != 'closed') return true;
+        if (issue.state !== 'closed') return true;
 
         let lower = l.toLowerCase();
         // ignore any labels that should have been removed when the issue was closed
-        return lower != 'doing' && lower != 'to do';
+        return lower !== 'doing' && lower !== 'to do';
       });
     }
 
@@ -251,7 +251,7 @@ export default class GithubHelper {
     let notes = await this.gitlabHelper.getIssueNotes(issue.iid);
 
     // if there are no notes, then there is nothing to do!
-    if (notes.length == 0) {
+    if (notes.length === 0) {
       console.log(`\t...no issue comments available, nothing to migrate.`);
       return;
     }
@@ -345,7 +345,7 @@ export default class GithubHelper {
    */
   async updateIssueState(githubIssue, issue) {
     // default state is open so we don't have to update if the issue is closed.
-    if (issue.state != 'closed' || githubIssue.state == 'closed') return;
+    if (issue.state !== 'closed' || githubIssue.state === 'closed') return;
 
     let props = {
       owner: this.githubOwner,
@@ -568,7 +568,7 @@ export default class GithubHelper {
     );
 
     // if there are no notes, then there is nothing to do!
-    if (notes.length == 0) {
+    if (notes.length === 0) {
       console.log(
         `\t...no pull request comments available, nothing to migrate.`
       );
@@ -617,7 +617,7 @@ export default class GithubHelper {
     // but only if the username is a valid GitHub username
     if (pullRequest.assignee) {
       props.assignees = [];
-      if (pullRequest.assignee.username == settings.github.username) {
+      if (pullRequest.assignee.username === settings.github.username) {
         props.assignees.push(settings.github.username);
       } else if (
         settings.usermap &&
@@ -649,11 +649,11 @@ export default class GithubHelper {
     // make sure to add any labels that existed in GitLab
     if (pullRequest.labels) {
       props.labels = pullRequest.labels.filter(l => {
-        if (pullRequest.state != 'closed') return true;
+        if (pullRequest.state !== 'closed') return true;
 
         let lower = l.toLowerCase();
         // ignore any labels that should have been removed when the issue was closed
-        return lower != 'doing' && lower != 'to do';
+        return lower !== 'doing' && lower !== 'to do';
       });
     }
 
@@ -670,8 +670,8 @@ export default class GithubHelper {
    */
   async updatePullRequestState(githubPullRequest, pullRequest) {
     if (
-      pullRequest.state == 'merged' &&
-      githubPullRequest.state != 'closed' &&
+      pullRequest.state === 'merged' &&
+      githubPullRequest.state !== 'closed' &&
       !settings.debug
     ) {
       // Merging the pull request adds new commits to the tree; to avoid that, just close the merge requests
@@ -679,7 +679,7 @@ export default class GithubHelper {
     }
 
     // Default state is open so we don't have to update if the request is closed
-    if (pullRequest.state != 'closed' || githubPullRequest.state == 'closed')
+    if (pullRequest.state !== 'closed' || githubPullRequest.state === 'closed')
       return;
 
     let props = {
@@ -730,9 +730,10 @@ export default class GithubHelper {
 
   convertIssuesAndComments(str, item) {
     if (
-      (settings.usermap == null || Object.keys(settings.usermap).length == 0) &&
-      (settings.projectmap == null ||
-        Object.keys(settings.projectmap).length == 0)
+      (settings.usermap === null ||
+        Object.keys(settings.usermap).length === 0) &&
+      (settings.projectmap === null ||
+        Object.keys(settings.projectmap).length === 0)
     ) {
       return GithubHelper.addMigrationLine(str, item);
     } else {
@@ -773,10 +774,10 @@ export default class GithubHelper {
    */
   static addMigrationLine(str, item) {
     if (
-      item == null ||
-      item.author == null ||
-      item.author.username == null ||
-      item.created_at == null
+      item === null ||
+      item.author === null ||
+      item.author.username === null ||
+      item.created_at === null
     ) {
       return str;
     }

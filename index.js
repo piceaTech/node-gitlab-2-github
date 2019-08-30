@@ -258,7 +258,7 @@ async function transferIssues() {
       // Create placeholder issues so that new GitHub issues will have the same
       // issue number as in GitLab. If a placeholder is used it is because there
       // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
-      if (issues[i].iid != expectedIdx) {
+      if (issues[i].iid !== expectedIdx) {
         issues.splice(i, 0, createPlaceholderIssue(expectedIdx));
         issueCounters.nrOfPlaceholderIssues++;
         console.log(
