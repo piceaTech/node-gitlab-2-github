@@ -9,7 +9,7 @@ const sleep = milliseconds => {
  * from usermap and projectmap
  */
 const generateUserProjectRegex = () => {
-  var reString = '';
+  let reString = '';
   if (settings.usermap !== null && Object.keys(settings.usermap).length > 0) {
     reString = '@' + Object.keys(settings.usermap).join('|@');
   }

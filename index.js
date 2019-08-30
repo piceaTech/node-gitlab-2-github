@@ -12,7 +12,7 @@ const issueCounters = {
   nrOfFailedIssues: 0,
 };
 
-var settings = null;
+let settings = null;
 try {
   settings = require('./settings.js');
 } catch (e) {
@@ -44,13 +44,13 @@ if (
 }
 
 // Create a GitLab API object
-var gitlabApi = new Gitlab({
+const gitlabApi = new Gitlab({
   url: settings.gitlab.url,
   token: settings.gitlab.token,
 });
 
 // Create a GitHub API object
-var githubApi = new GitHubApi({
+const githubApi = new GitHubApi({
   debug: false,
   baseUrl: settings.github.baseUrl
     ? settings.github.baseUrl
