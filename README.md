@@ -112,15 +112,16 @@ When one renames the project while transfering so that the projects don't loose 
 
 ## Import limit
 
-Because Github has a limit of 5000 Api requests per hour one has to watch out that one doesn't get over this limit. I transfered one of my project with it ~ 300 issues with ~ 200 notes. This totals to some 500 objects excluding commits which are imported through githubs importer. I never got under 3800 remaining requests (while testing it two times in one hour).
+Because Github has a limit of 5000 Api requests per hour one has to watch out that one doesn't get over this limit. I transferred one of my project with it ~ 300 issues with ~ 200 notes. This totals to some 500 objects excluding commits which are imported through githubs importer. I never got under 3800 remaining requests (while testing it two times in one hour).
 
 So the rule of thumb should be that one can import a repo with ~ 2500 issues without a problem.
 
 ## Bugs
 
-### issue migration fail
+### Issue migration fail
 
-See section 'useReplacementIssuesForCreationFails' above!
+See section 'useReplacementIssuesForCreationFails' above for more infos!
+One reason seems to be some error with `Octokit` (error message snippet: https://pastebin.com/3VNUNYLh)
 
 ### Milestone refs and issue refs
 
@@ -130,3 +131,15 @@ and issue refs like `#42` do not remap to the `#42` from gitlab under the new
 issue number in github. @ references are remapped properly (yay). If this is a
 deal breaker, a large amount of the code to do this has been written it just
 appears to no longer work in current form :(
+
+## Feature suggestions / ideas
+
+### Throttling mechanism
+
+A throttling mechanism could maybe help to avoid api rate limit errors.
+In some scenarios the ability to migrate is probably more important than the total
+duration of the migration process. Some users may even be willing to accept a very long duration (> 1 day if necessary?), if they can get the migration done at all, in return.
+
+### Make request run in parallel
+
+Some requests could be run in parallel, to shorten the total duration. Currently all GitLab- and Github-Api-Requests are being run sequentially.
