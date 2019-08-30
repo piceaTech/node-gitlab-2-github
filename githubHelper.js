@@ -278,24 +278,43 @@ export default class GithubHelper {
 
   // ----------------------------------------------------------------------------
 
+  /**
+   * This function checks if a note needs to be processed or if it can be skipped.
+   * A note can be skipped if it contains predefined terms (like 'Status changed to...')
+   * or if it contains any value from settings.skipMatchingComments ->
+   * Note that this is case insensitive!
+   *
+   */
+  checkIfNoteCanBeSkipped(noteBody) {
+    const stateChange =
+      (/Status changed to .*/i.test(noteBody) &&
+        !/Status changed to closed by commit.*/i.test(noteBody)) ||
+      /changed milestone to .*/i.test(noteBody) ||
+      /Milestone changed to .*/i.test(noteBody) ||
+      /Reassigned to /i.test(noteBody) ||
+      /added .* labels/i.test(noteBody) ||
+      /Added ~.* label/i.test(noteBody) ||
+      /removed ~.* label/i.test(noteBody) ||
+      /mentioned in issue.*/i.test(noteBody);
+
+    const matchingComment = settings.skipMatchingComments.reduce(
+      (a, b) => a || new RegExp(b, 'i').test(noteBody),
+      false
+    );
+
+    return stateChange || matchingComment;
+  }
+
+  // ----------------------------------------------------------------------------
+
   /*
    * Processes the current note.
    * This means, it either creates a comment in the github issue, or it gets skipped.
    * Return false when it got skipped, otherwise true.
    */
   async processNote(note, githubIssue) {
-    if (
-      (/Status changed to .*/i.test(note.body) &&
-        !/Status changed to closed by commit.*/i.test(note.body)) ||
-      /changed milestone to .*/i.test(note.body) ||
-      /Milestone changed to .*/i.test(note.body) ||
-      /Reassigned to /i.test(note.body) ||
-      /added .* labels/i.test(note.body) ||
-      /Added ~.* label/i.test(note.body) ||
-      /removed ~.* label/i.test(note.body) ||
-      /mentioned in issue.*/i.test(note.body)
-    ) {
-      // Don't transfer when the state changed (this is a note in GitLab)
+    if (this.checkIfNoteCanBeSkipped(note.body)) {
+      // note will be skipped
       return false;
     } else {
       let bodyConverted = await this.convertIssuesAndComments(note.body, note);

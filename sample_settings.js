@@ -24,6 +24,7 @@ module.exports = {
   debug: false,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
+  skipMatchingComments: [],
   mergeRequests: {
     logFile: './merge-requests.json',
     log: false,

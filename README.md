@@ -90,6 +90,12 @@ If this is set to true (default) then the migration process will automatically c
 
 If this is set to true (default) then the migration process will automatically create empty dummy issues for every issue where the migration fails. The state of the replacement issue will be the same as on GitLab (an open issue remains open, a closed one will be closed). In the future, the description of the replacement issue will also contain a link to the original issue on GitLab. This way users, who still have access to the GitLab repository can still view its content. However, this is still an open task. (TODO)
 
+#### skipMatchingComments
+
+This is an array (empty per default) that may contain string values. Any note/comment in any issue, that contains one or more of those string values, will be skipped (meaining not migrated). Note that this is case insensitive, therefore the string value `foo` would also lead to skipping notes containing a (sub)string `FOO`.
+
+Suggested values are things like `time spent`, since those kind of terms can be used in GitLab to track time, they are rather meaningless in Github though.
+
 #### mergeRequests
 
 Object consisting of `logfile` and `log`. If `log` is set to true, then the merge requests are logged in the specified file and not migrated. Conversely, if `log` is set to false, then the merge requests are migrated to GitHub and not logged. If the source or target branches linked to the merge request have been deleted, the merge request cannot be migrated to a pull request; instead, an issue with a custom "gitlab merge request" tag is created with the full comment history of the merge request.
