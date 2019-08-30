@@ -79,6 +79,22 @@ if (settings.gitlab.projectId === null) {
 /*
  * TODO description
  */
+function createPlaceholderIssue(expectedIdx) {
+  return {
+    iid: expectedIdx,
+    title: `[PLACEHOLDER ISSUE] - for issue #${expectedIdx}`,
+    description:
+      'This is to ensure the issue numbers in GitLab and GitHub are the same',
+    state: 'closed',
+    isPlaceholder: true,
+  };
+}
+
+// ----------------------------------------------------------------------------
+
+/*
+ * TODO description
+ */
 function createReplacementIssue(id, title, state) {
   const originalGitlabIssueLink = 'TODO'; // TODO
   const description = `The original issue\n\n\tId: ${id}\n\tTitle: ${title}\n\ncould not be created.\nThis is a dummy issue, replacing the original one. It contains everything but the original issue description. In case the gitlab repository is still existing, visit the following link to show the original issue:\n\n${originalGitlabIssueLink}`;
@@ -243,14 +259,7 @@ async function transferIssues() {
       // issue number as in GitLab. If a placeholder is used it is because there
       // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
       if (issues[i].iid != expectedIdx) {
-        issues.splice(i, 0, {
-          iid: expectedIdx,
-          title: `[PLACEHOLDER ISSUE] - for issue #${expectedIdx}`,
-          description:
-            'This is to ensure the issue numbers in GitLab and GitHub are the same',
-          state: 'closed',
-          isPlaceholder: true,
-        });
+        issues.splice(i, 0, createPlaceholderIssue(expectedIdx));
         issueCounters.nrOfPlaceholderIssues++;
         console.log(
           `Added placeholder issue for GitLab issue #${expectedIdx}.`
