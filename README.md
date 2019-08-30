@@ -88,7 +88,9 @@ If this is set to true (default) then the migration process will automatically c
 
 #### useReplacementIssuesForCreationFails
 
-If this is set to true (default) then the migration process will automatically create empty dummy issues for every issue where the migration fails. The state of the replacement issue will be the same as on GitLab (an open issue remains open, a closed one will be closed). In the future, the description of the replacement issue will also contain a link to the original issue on GitLab. This way users, who still have access to the GitLab repository can still view its content. However, this is still an open task. (TODO)
+If this is set to true (default) then the migration process will automatically create so called "replacement-issues" for every issue where the migration fails. This replacement issue will be exactly the same, but the original description will be lost. In the future, the description of the replacement issue will also contain a link to the original issue on GitLab. This way users, who still have access to the GitLab repository can still view its content. However, this is still an open task. (TODO)
+
+It would of course be better to find the cause for migration fails, so that no replacement issues would be needed. Finding the cause together with a retry-mechanism would be optimal, and will maybe come in the future - currently the replacement-issue-mechanism helps to keep things in order.
 
 #### skipMatchingComments
 
@@ -115,6 +117,12 @@ Because Github has a limit of 5000 Api requests per hour one has to watch out th
 So the rule of thumb should be that one can import a repo with ~ 2500 issues without a problem.
 
 ## Bugs
+
+### issue migration fail
+
+See section 'useReplacementIssuesForCreationFails' above!
+
+### Milestone refs and issue refs
 
 the milestone refs and issue refs do not seem to be rewritten properly at the
 moment. specifically, milestones show up like `%4` in comments

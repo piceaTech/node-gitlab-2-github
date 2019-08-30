@@ -76,13 +76,16 @@ if (settings.gitlab.projectId === null) {
 
 // ----------------------------------------------------------------------------
 
+/*
+ * TODO description
+ */
 function createReplacementIssue(id, title, state) {
   const originalGitlabIssueLink = 'TODO'; // TODO
-  const description = `The original issue\n\n\tId: ${id}\n\tTitle: ${title}\n\ncould not be created.\nThis is a dummy issue, replacing the original one. In case the gitlab repository is still existing, visit the following link to show the original issue:\n\n${originalGitlabIssueLink}`;
+  const description = `The original issue\n\n\tId: ${id}\n\tTitle: ${title}\n\ncould not be created.\nThis is a dummy issue, replacing the original one. It contains everything but the original issue description. In case the gitlab repository is still existing, visit the following link to show the original issue:\n\n${originalGitlabIssueLink}`;
 
   return {
     iid: id,
-    title: `[REPLACEMENT ISSUE] - for issue #${id}`,
+    title: `${title} [REPLACEMENT ISSUE]`,
     description,
     state,
   };
@@ -274,6 +277,8 @@ async function transferIssues() {
         console.log(`\t...DONE migrating issue #${issue.iid}.`);
       } catch (err) {
         console.log(`\t...ERROR while migrating issue #${issue.iid}.`);
+
+        console.error('DEBUG:\n', err); // TODO delete this after issue-migration-fails have been fixed
 
         if (settings.useReplacementIssuesForCreationFails) {
           console.log('\t-> creating a replacement issue...');

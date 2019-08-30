@@ -161,10 +161,7 @@ export default class GithubHelper {
    * TODO description
    */
   async createIssue(milestones, issue) {
-    let bodyConverted = await this.convertIssuesAndComments(
-      issue.description,
-      issue
-    );
+    let bodyConverted = this.convertIssuesAndComments(issue.description, issue);
 
     let props = {
       owner: this.githubOwner,
@@ -317,7 +314,7 @@ export default class GithubHelper {
       // note will be skipped
       return false;
     } else {
-      let bodyConverted = await this.convertIssuesAndComments(note.body, note);
+      let bodyConverted = this.convertIssuesAndComments(note.body, note);
 
       await utils.sleep(2000);
 
@@ -503,7 +500,7 @@ export default class GithubHelper {
     if (settings.debug) return Promise.resolve({ data: pullRequest });
 
     if (canCreate) {
-      let bodyConverted = await this.convertIssuesAndComments(
+      let bodyConverted = this.convertIssuesAndComments(
         pullRequest.description,
         pullRequest
       );
@@ -530,7 +527,7 @@ export default class GithubHelper {
         ' -> ' +
         pullRequest.target_branch +
         '_\n\n';
-      let bodyConverted = await this.convertIssuesAndComments(
+      let bodyConverted = this.convertIssuesAndComments(
         mergeStr + pullRequest.description,
         pullRequest
       );
@@ -710,8 +707,8 @@ export default class GithubHelper {
    */
   async createIssueAndComments(milestones, issue) {
     // create the issue in GitHub
-    let githubIssueData = await this.createIssue(milestones, issue);
-    let githubIssue = githubIssueData.data;
+    const githubIssueData = await this.createIssue(milestones, issue);
+    const githubIssue = githubIssueData.data;
 
     // add any comments/notes associated with this issue
     await this.createIssueComments(githubIssue, issue);
@@ -731,7 +728,7 @@ export default class GithubHelper {
    * - Change username from GitLab to GitHub in "mentions" (@username)
    */
 
-  async convertIssuesAndComments(str, item) {
+  convertIssuesAndComments(str, item) {
     if (
       (settings.usermap == null || Object.keys(settings.usermap).length == 0) &&
       (settings.projectmap == null ||
