@@ -67,7 +67,7 @@ const githubHelper = new GithubHelper(githubApi, settings.github, gitlabHelper);
 
 // If no project id is given in settings.js, just return
 // all of the projects that this user is associated with.
-if (settings.gitlab.projectId === null) {
+if (!settings.gitlab.projectId) {
   gitlabHelper.listProjects();
 } else {
   // user has chosen a project

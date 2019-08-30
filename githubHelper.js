@@ -730,10 +730,8 @@ export default class GithubHelper {
 
   convertIssuesAndComments(str, item) {
     if (
-      (settings.usermap === null ||
-        Object.keys(settings.usermap).length === 0) &&
-      (settings.projectmap === null ||
-        Object.keys(settings.projectmap).length === 0)
+      (!settings.usermap || Object.keys(settings.usermap).length === 0) &&
+      (!settings.projectmap || Object.keys(settings.projectmap).length === 0)
     ) {
       return GithubHelper.addMigrationLine(str, item);
     } else {
@@ -773,12 +771,7 @@ export default class GithubHelper {
    * and from GitLab.
    */
   static addMigrationLine(str, item) {
-    if (
-      item === null ||
-      item.author === null ||
-      item.author.username === null ||
-      item.created_at === null
-    ) {
+    if (!item || !item.author || !item.author.username || !item.created_at) {
       return str;
     }
 
