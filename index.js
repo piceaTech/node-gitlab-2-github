@@ -309,6 +309,20 @@ async function transferIssues() {
       }
     }
   }
+
+  // print statistics about issue migration:
+  console.log(`DONE creating issues.`);
+  console.log(`\n\tStatistics:`);
+  console.log(`\tTotal nr. of issues: ${issues.length}`);
+  console.log(
+    `\tNr. of used placeholder issues: ${issueCounters.nrOfPlaceholderIssues}`
+  );
+  console.log(
+    `\tNr. of used replacement issues: ${issueCounters.nrOfReplacementIssues}`
+  );
+  console.log(
+    `\tNr. of issue migration fails: ${issueCounters.nrOfFailedIssues}`
+  );
 }
 // ----------------------------------------------------------------------------
 
