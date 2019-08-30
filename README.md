@@ -86,6 +86,10 @@ As default it is set to false. Doesn't fire the requests to github api and only 
 
 If this is set to true (default) then the migration process will automatically create empty dummy issues for every 'missing' GitLab issue (if you deleted an GitLab issue for example). Those issues will be closed on Github and they ensure, that the issue ids stay the same on both, GitLab and Github.
 
+#### useReplacementIssuesForCreationFails
+
+If this is set to true (default) then the migration process will automatically create empty dummy issues for every issue where the migration fails. The state of the replacement issue will be the same as on GitLab (an open issue remains open, a closed one will be closed). In the future, the description of the replacement issue will also contain a link to the original issue on GitLab. This way users, who still have access to the GitLab repository can still view its content. However, this is still an open task. (TODO)
+
 #### mergeRequests
 
 Object consisting of `logfile` and `log`. If `log` is set to true, then the merge requests are logged in the specified file and not migrated. Conversely, if `log` is set to false, then the merge requests are migrated to GitHub and not logged. If the source or target branches linked to the merge request have been deleted, the merge request cannot be migrated to a pull request; instead, an issue with a custom "gitlab merge request" tag is created with the full comment history of the merge request.

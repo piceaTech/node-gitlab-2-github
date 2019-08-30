@@ -23,6 +23,7 @@ module.exports = {
   },
   debug: false,
   usePlaceholderIssuesForMissingIssues: true,
+  useReplacementIssuesForCreationFails: true,
   mergeRequests: {
     logFile: './merge-requests.json',
     log: false,

@@ -6,6 +6,12 @@ const Gitlab = require('gitlab').default;
 const async = require('async');
 const fs = require('fs');
 
+const issueCounters = {
+  nrOfPlaceholderIssues: 0,
+  nrOfReplacementIssues: 0,
+  nrOfFailedIssues: 0,
+};
+
 var settings = null;
 try {
   settings = require('./settings.js');
@@ -66,6 +72,20 @@ if (settings.gitlab.projectId === null) {
 } else {
   // user has chosen a project
   migrate();
+}
+
+// ----------------------------------------------------------------------------
+
+function createReplacementIssue(id, title, state) {
+  const originalGitlabIssueLink = 'TODO'; // TODO
+  const description = `The original issue\n\n\tId: ${id}\n\tTitle: ${title}\n\ncould not be created.\nThis is a dummy issue, replacing the original one. In case the gitlab repository is still existing, visit the following link to show the original issue:\n\n${originalGitlabIssueLink}`;
+
+  return {
+    iid: id,
+    title: `[REPLACEMENT ISSUE] - for issue #${id}`,
+    description,
+    state,
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -228,6 +248,7 @@ async function transferIssues() {
           state: 'closed',
           isPlaceholder: true,
         });
+        issueCounters.nrOfPlaceholderIssues++;
         console.log(
           `Added placeholder issue for GitLab issue #${expectedIdx}.`
         );
@@ -250,9 +271,33 @@ async function transferIssues() {
       try {
         // process asynchronous code in sequence -- treats the code sort of like blocking
         await githubHelper.createIssueAndComments(milestoneData, issue);
-        console.log(`...DONE migrating issue #${issue.iid}.`);
+        console.log(`\t...DONE migrating issue #${issue.iid}.`);
       } catch (err) {
-        console.log(`...ERROR while migrating issue #${issue.iid}.`);
+        console.log(`\t...ERROR while migrating issue #${issue.iid}.`);
+
+        if (settings.useReplacementIssuesForCreationFails) {
+          console.log('\t-> creating a replacement issue...');
+          const replacementIssue = createReplacementIssue(
+            issue.iid,
+            issue.title,
+            issue.state
+          );
+
+          try {
+            await githubHelper.createIssueAndComments(
+              milestoneData,
+              replacementIssue
+            );
+
+            issueCounters.nrOfReplacementIssues++;
+            console.error('\t...DONE.');
+          } catch (err) {
+            issueCounters.nrOfFailedIssues++;
+            console.error(
+              '\t...ERROR: Could not create replacement issue either!'
+            );
+          }
+        }
       }
     } else {
       console.log(`Updating issue #${issue.iid} - ${issue.title}...`);

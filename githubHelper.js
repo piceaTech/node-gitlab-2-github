@@ -264,7 +264,7 @@ export default class GithubHelper {
 
     let nrOfMigratedNotes = 0;
     for (let note of notes) {
-      const gotMigrated = await this.processNote(note);
+      const gotMigrated = await this.processNote(note, githubIssue);
       if (gotMigrated) {
         nrOfMigratedNotes++;
       }
@@ -283,7 +283,7 @@ export default class GithubHelper {
    * This means, it either creates a comment in the github issue, or it gets skipped.
    * Return false when it got skipped, otherwise true.
    */
-  async processNote(note) {
+  async processNote(note, githubIssue) {
     if (
       (/Status changed to .*/i.test(note.body) &&
         !/Status changed to closed by commit.*/i.test(note.body)) ||
@@ -305,7 +305,7 @@ export default class GithubHelper {
       if (settings.debug) {
         return true;
       }
-      // process asynchronous code in sequence -- treats kind of like blocking
+
       await this.githubApi.issues
         .createComment({
           owner: this.githubOwner,
@@ -564,7 +564,7 @@ export default class GithubHelper {
 
     let nrOfMigratedNotes = 0;
     for (let note of notes) {
-      const gotMigrated = await this.processNote(note);
+      const gotMigrated = await this.processNote(note, githubPullRequest);
       if (gotMigrated) {
         nrOfMigratedNotes++;
       }
