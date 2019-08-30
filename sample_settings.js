@@ -22,6 +22,7 @@ module.exports = {
     useLowerCaseLabels: true,
   },
   debug: false,
+  usePlaceholderIssuesForMissingIssues: true,
   mergeRequests: {
     logFile: './merge-requests.json',
     log: false,

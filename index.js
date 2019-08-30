@@ -210,28 +210,28 @@ async function transferIssues() {
 
   console.log(`Transferring ${issues.length} issues.`);
 
-  //
-  // Create Placeholder Issues
-  //
+  if (settings.usePlaceholderIssuesForMissingIssues) {
+    for (let i = 0; i < issues.length; i++) {
+      // GitLab issue internal Id (iid)
+      let expectedIdx = i + 1;
 
-  for (let i = 0; i < issues.length; i++) {
-    // GitLab issue internal Id (iid)
-    let expectedIdx = i + 1;
-
-    // is there a gap in the GitLab issues?
-    // Create placeholder issues so that new GitHub issues will have the same
-    // issue number as in GitLab. If a placeholder is used it is because there
-    // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
-    if (issues[i].iid != expectedIdx) {
-      issues.splice(i, 0, {
-        iid: expectedIdx,
-        title: `placeholder issue for issue ${expectedIdx} which does not exist and was probably deleted in GitLab`,
-        description:
-          'This is to ensure the issue numbers in GitLab and GitHub are the same',
-        state: 'closed',
-        isPlaceholder: true,
-      });
-      console.log(`Added placeholder issue for GitLab issue #${expectedIdx}.`);
+      // is there a gap in the GitLab issues?
+      // Create placeholder issues so that new GitHub issues will have the same
+      // issue number as in GitLab. If a placeholder is used it is because there
+      // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
+      if (issues[i].iid != expectedIdx) {
+        issues.splice(i, 0, {
+          iid: expectedIdx,
+          title: `[PLACEHOLDER ISSUE] - for issue #${expectedIdx}`,
+          description:
+            'This is to ensure the issue numbers in GitLab and GitHub are the same',
+          state: 'closed',
+          isPlaceholder: true,
+        });
+        console.log(
+          `Added placeholder issue for GitLab issue #${expectedIdx}.`
+        );
+      }
     }
   }
 
