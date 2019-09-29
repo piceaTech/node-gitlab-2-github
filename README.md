@@ -38,7 +38,7 @@ The user must be a member of the project you want to copy or else you won't see 
 
 1. `cp sample_settings.js settings.js`
 1. edit settings.js
-1. run `node index.js`
+1. run `npm run start`
 
 ## Where to find info for the `settings.js`
 
@@ -82,6 +82,22 @@ What is the name of the new repo
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlabb side to test for wonky cases before using up api-calls
 
+#### usePlaceholderIssuesForMissingIssues
+
+If this is set to true (default) then the migration process will automatically create empty dummy issues for every 'missing' GitLab issue (if you deleted an GitLab issue for example). Those issues will be closed on Github and they ensure, that the issue ids stay the same on both, GitLab and Github.
+
+#### useReplacementIssuesForCreationFails
+
+If this is set to true (default) then the migration process will automatically create so called "replacement-issues" for every issue where the migration fails. This replacement issue will be exactly the same, but the original description will be lost. In the future, the description of the replacement issue will also contain a link to the original issue on GitLab. This way users, who still have access to the GitLab repository can still view its content. However, this is still an open task. (TODO)
+
+It would of course be better to find the cause for migration fails, so that no replacement issues would be needed. Finding the cause together with a retry-mechanism would be optimal, and will maybe come in the future - currently the replacement-issue-mechanism helps to keep things in order.
+
+#### skipMatchingComments
+
+This is an array (empty per default) that may contain string values. Any note/comment in any issue, that contains one or more of those string values, will be skipped (meaining not migrated). Note that this is case insensitive, therefore the string value `foo` would also lead to skipping notes containing a (sub)string `FOO`.
+
+Suggested values are things like `time spent`, since those kind of terms can be used in GitLab to track time, they are rather meaningless in Github though.
+
 #### mergeRequests
 
 Object consisting of `logfile` and `log`. If `log` is set to true, then the merge requests are logged in the specified file and not migrated. Conversely, if `log` is set to false, then the merge requests are migrated to GitHub and not logged. If the source or target branches linked to the merge request have been deleted, the merge request cannot be migrated to a pull request; instead, an issue with a custom "gitlab merge request" tag is created with the full comment history of the merge request.
@@ -96,11 +112,18 @@ When one renames the project while transfering so that the projects don't loose 
 
 ## Import limit
 
-Because Github has a limit of 5000 Api requests per hour one has to watch out that one doesn't get over this limit. I transfered one of my project with it ~ 300 issues with ~ 200 notes. This totals to some 500 objects excluding commits which are imported through githubs importer. I never got under 3800 remaining requests (while testing it two times in one hour).
+Because Github has a limit of 5000 Api requests per hour one has to watch out that one doesn't get over this limit. I transferred one of my project with it ~ 300 issues with ~ 200 notes. This totals to some 500 objects excluding commits which are imported through githubs importer. I never got under 3800 remaining requests (while testing it two times in one hour).
 
 So the rule of thumb should be that one can import a repo with ~ 2500 issues without a problem.
 
 ## Bugs
+
+### Issue migration fail
+
+See section 'useReplacementIssuesForCreationFails' above for more infos!
+One reason seems to be some error with `Octokit` (error message snippet: https://pastebin.com/3VNUNYLh)
+
+### Milestone refs and issue refs
 
 the milestone refs and issue refs do not seem to be rewritten properly at the
 moment. specifically, milestones show up like `%4` in comments
@@ -108,3 +131,15 @@ and issue refs like `#42` do not remap to the `#42` from gitlab under the new
 issue number in github. @ references are remapped properly (yay). If this is a
 deal breaker, a large amount of the code to do this has been written it just
 appears to no longer work in current form :(
+
+## Feature suggestions / ideas
+
+### Throttling mechanism
+
+A throttling mechanism could maybe help to avoid api rate limit errors.
+In some scenarios the ability to migrate is probably more important than the total
+duration of the migration process. Some users may even be willing to accept a very long duration (> 1 day if necessary?), if they can get the migration done at all, in return.
+
+### Make request run in parallel
+
+Some requests could be run in parallel, to shorten the total duration. Currently all GitLab- and Github-Api-Requests are being run sequentially.
