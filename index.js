@@ -56,6 +56,7 @@ const githubApi = new GitHubApi({
     ? settings.github.baseUrl
     : 'https://api.github.com',
   timeout: 5000,
+  rejectUnauthorized: true,
   headers: {
     'user-agent': 'node-gitlab-2-github', // GitHub is happy with a unique user agent
     accept: 'application/vnd.github.v3+json',
