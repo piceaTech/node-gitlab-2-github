@@ -25,14 +25,7 @@ try {
   process.exit(1);
 }
 
-// Ensure that the GitLab URL and token has been set in settings.js
-if (
-  !settings.gitlab.url ||
-  settings.gitlab.url === 'http://gitlab.mycompany.com/'
-) {
-  console.log('\n\nYou have to enter your GitLab url in the settings.js file.');
-  process.exit(1);
-}
+// Ensure that the GitLab token has been set in settings.js
 if (
   !settings.gitlab.token ||
   settings.gitlab.token === '{{gitlab private token}}'
