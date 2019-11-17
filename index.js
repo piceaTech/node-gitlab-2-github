@@ -117,7 +117,7 @@ async function migrate() {
 
   try {
     // transfer GitLab milestones to GitHub
-    await transferMilestones(settings.gitlab.projectId);
+    await transferMilestones();
 
     // transfer GitLab labels to GitHub
     await transferLabels(true, settings.conversion.useLowerCaseLabels);
@@ -144,11 +144,13 @@ async function migrate() {
 /**
  * Transfer any milestones that exist in GitLab that do not exist in GitHub.
  */
-async function transferMilestones(projectId) {
+async function transferMilestones() {
   inform('Transferring Milestones');
 
   // Get a list of all milestones associated with this project
-  let milestones = await gitlabApi.ProjectMilestones.all(projectId);
+  let milestones = await gitlabApi.ProjectMilestones.all(
+    settings.gitlab.projectId
+  );
 
   // sort milestones in ascending order of when they were created (by id)
   milestones = milestones.sort((a, b) => a.id - b.id);
