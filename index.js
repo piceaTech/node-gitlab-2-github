@@ -45,7 +45,7 @@ if (
 
 // Create a GitLab API object
 const gitlabApi = new Gitlab({
-  host: settings.gitlab.url,
+  host: settings.gitlab.url ? settings.gitlab.url : 'http://gitlab.com',
   token: settings.gitlab.token,
 });
 

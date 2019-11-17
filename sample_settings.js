@@ -1,11 +1,11 @@
 module.exports = {
   gitlab: {
-    url: 'http://gitlab.mycompany.com/', // probably: https://gitlab.com
+    // url: 'https://gitlab.mycompany.com',
     token: '{{gitlab private token}}',
     projectId: null,
   },
   github: {
-    // "baseUrl":"https://gitlab.mycompany.com:123/etc",
+    // baseUrl: 'https://gitlab.mycompany.com:123/etc',
     owner: '{{repository owner (user or organization)}}',
     token: '{{token}}',
     repo: '{{repo}}',

@@ -46,7 +46,7 @@ The user must be a member of the project you want to copy or else you won't see 
 
 #### gitlab.url
 
-The URL under which your gitlab instance is hosted.
+The URL under which your gitlab instance is hosted. Default is the official `http://gitlab.com` domain.
 
 #### gitlab.token
 
@@ -65,10 +65,6 @@ Where is the github instance hosted? Default is the official `api.github.com` do
 #### github.owner
 
 Under which organisation or user will the new project be hosted
-
-#### github.username
-
-Go to your settings. Open the Access Token tab. Create a new Access Token and copy that into the `settings.js`
 
 #### github.token
 
