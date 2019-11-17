@@ -122,20 +122,25 @@ async function migrate() {
   // Sequentially transfer repo things
   //
 
-  // transfer GitLab milestones to GitHub
-  await transferMilestones(settings.gitlab.projectId);
+  try {
+    // transfer GitLab milestones to GitHub
+    await transferMilestones(settings.gitlab.projectId);
 
-  // transfer GitLab labels to GitHub
-  await transferLabels(true, settings.conversion.useLowerCaseLabels);
+    // transfer GitLab labels to GitHub
+    await transferLabels(true, settings.conversion.useLowerCaseLabels);
 
-  // Transfer issues with their comments; do this before transferring the merge requests
-  await transferIssues();
+    // Transfer issues with their comments; do this before transferring the merge requests
+    await transferIssues();
 
-  if (settings.mergeRequests.log) {
-    // log merge requests
-    await logMergeRequests(settings.mergeRequests.logFile);
-  } else {
-    await transferMergeRequests();
+    if (settings.mergeRequests.log) {
+      // log merge requests
+      await logMergeRequests(settings.mergeRequests.logFile);
+    } else {
+      await transferMergeRequests();
+    }
+  } catch (err) {
+    console.error('Error during transfer:');
+    console.error(err);
   }
 
   console.log('\n\nTransfer complete!\n\n');
