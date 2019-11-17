@@ -2,7 +2,7 @@ import GithubHelper from './githubHelper';
 import GitlabHelper from './gitlabHelper';
 
 const GitHubApi = require('@octokit/rest');
-const Gitlab = require('gitlab').default;
+const { Gitlab } = require('gitlab');
 const async = require('async');
 const fs = require('fs');
 
@@ -45,7 +45,7 @@ if (
 
 // Create a GitLab API object
 const gitlabApi = new Gitlab({
-  url: settings.gitlab.url,
+  host: settings.gitlab.url,
   token: settings.gitlab.token,
 });
 
