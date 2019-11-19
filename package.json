@@ -27,7 +27,7 @@
   "dependencies": {
     "@octokit/rest": "^16.1.0",
     "async": "^1.4.0",
-    "gitlab": "^4.2.7",
+    "gitlab": "^11.5.1",
     "request": "^2.88.0"
   },
   "devDependencies": {

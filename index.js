@@ -2,7 +2,7 @@ import GithubHelper from './githubHelper';
 import GitlabHelper from './gitlabHelper';
 
 const GitHubApi = require('@octokit/rest');
-const Gitlab = require('gitlab').default;
+const { Gitlab } = require('gitlab');
 const async = require('async');
 const fs = require('fs');
 
@@ -25,14 +25,7 @@ try {
   process.exit(1);
 }
 
-// Ensure that the GitLab URL and token has been set in settings.js
-if (
-  !settings.gitlab.url ||
-  settings.gitlab.url === 'http://gitlab.mycompany.com/'
-) {
-  console.log('\n\nYou have to enter your GitLab url in the settings.js file.');
-  process.exit(1);
-}
+// Ensure that the GitLab token has been set in settings.js
 if (
   !settings.gitlab.token ||
   settings.gitlab.token === '{{gitlab private token}}'
@@ -45,7 +38,7 @@ if (
 
 // Create a GitLab API object
 const gitlabApi = new Gitlab({
-  url: settings.gitlab.url,
+  host: settings.gitlab.url ? settings.gitlab.url : 'http://gitlab.com',
   token: settings.gitlab.token,
 });
 
@@ -122,20 +115,25 @@ async function migrate() {
   // Sequentially transfer repo things
   //
 
-  // transfer GitLab milestones to GitHub
-  await transferMilestones(settings.gitlab.projectId);
+  try {
+    // transfer GitLab milestones to GitHub
+    await transferMilestones();
 
-  // transfer GitLab labels to GitHub
-  await transferLabels(true, settings.conversion.useLowerCaseLabels);
+    // transfer GitLab labels to GitHub
+    await transferLabels(true, settings.conversion.useLowerCaseLabels);
 
-  // Transfer issues with their comments; do this before transferring the merge requests
-  await transferIssues();
+    // Transfer issues with their comments; do this before transferring the merge requests
+    await transferIssues();
 
-  if (settings.mergeRequests.log) {
-    // log merge requests
-    await logMergeRequests(settings.mergeRequests.logFile);
-  } else {
-    await transferMergeRequests();
+    if (settings.mergeRequests.log) {
+      // log merge requests
+      await logMergeRequests(settings.mergeRequests.logFile);
+    } else {
+      await transferMergeRequests();
+    }
+  } catch (err) {
+    console.error('Error during transfer:');
+    console.error(err);
   }
 
   console.log('\n\nTransfer complete!\n\n');
@@ -146,11 +144,13 @@ async function migrate() {
 /**
  * Transfer any milestones that exist in GitLab that do not exist in GitHub.
  */
-async function transferMilestones(projectId) {
+async function transferMilestones() {
   inform('Transferring Milestones');
 
   // Get a list of all milestones associated with this project
-  let milestones = await gitlabApi.ProjectMilestones.all(projectId);
+  let milestones = await gitlabApi.ProjectMilestones.all(
+    settings.gitlab.projectId
+  );
 
   // sort milestones in ascending order of when they were created (by id)
   milestones = milestones.sort((a, b) => a.id - b.id);

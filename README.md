@@ -46,15 +46,15 @@ The user must be a member of the project you want to copy or else you won't see 
 
 #### gitlab.url
 
-The URL under which your gitlab instance is hosted.
+The URL under which your gitlab instance is hosted. Default is the official `http://gitlab.com` domain.
 
 #### gitlab.token
 
-Go to your settings. Open the Access Token tab. Create a new Access Token and copy that into the `settings.js`
+Go to [Settings / Access Tokens](https://gitlab.com/profile/personal_access_tokens). Create a new Access Token with `api` and `read_repository` scopes and copy that into the `settings.js`
 
 #### gitlab.projectID
 
-Leave it null for the first run of the script. Then the script will show you which projects there are.
+Leave it null for the first run of the script. Then the script will show you which projects there are. Can be either string or number.
 
 ### github
 
@@ -66,13 +66,9 @@ Where is the github instance hosted? Default is the official `api.github.com` do
 
 Under which organisation or user will the new project be hosted
 
-#### github.username
-
-Go to your settings. Open the Access Token tab. Create a new Access Token and copy that into the `settings.js`
-
 #### github.token
 
-Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token and copy that into the `settings.js`
+Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token with `repo` scope and copy that into the `settings.js`
 
 #### github.repo
 
@@ -96,7 +92,10 @@ It would of course be better to find the cause for migration fails, so that no r
 
 This is an array (empty per default) that may contain string values. Any note/comment in any issue, that contains one or more of those string values, will be skipped (meaining not migrated). Note that this is case insensitive, therefore the string value `foo` would also lead to skipping notes containing a (sub)string `FOO`.
 
-Suggested values are things like `time spent`, since those kind of terms can be used in GitLab to track time, they are rather meaningless in Github though.
+Suggested values:
+
+- `time spent`, since those kind of terms can be used in GitLab to track time, they are rather meaningless in Github though
+- action entries, such as `changed the description`, `added 1 commit`, `mentioned in merge request`, etc as they are interpreted as comments
 
 #### mergeRequests
 
