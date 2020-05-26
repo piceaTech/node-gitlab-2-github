@@ -13,6 +13,8 @@ export default class GithubHelper {
   githubTimeout?: number;
   gitlabHelper: GitlabHelper;
   userProjectRegex: RegExp;
+  repoId?: number;
+  delayInMs: number;
 
   constructor(githubApi: GitHubApi, githubSettings: GithubSettings, gitlabHelper: GitlabHelper) {
     this.githubApi = githubApi;
@@ -23,6 +25,7 @@ export default class GithubHelper {
     this.gitlabHelper = gitlabHelper;
     // regex for converting user from GitLab to GitHub
     this.userProjectRegex = utils.generateUserProjectRegex();
+    this.delayInMs = 2000;
   }
 
   /*
@@ -32,11 +35,33 @@ export default class GithubHelper {
    */
 
   /**
+   * Store the new repo id
+   */
+  async registerRepoId() {
+    try {
+      await utils.sleep(this.delayInMs);
+      // get an array of GitHub milestones for the new repo
+      let result = await this.githubApi.repos.get({
+        owner: this.githubOwner,
+        repo: this.githubRepo
+      });
+
+      this.repoId = result.data.id;
+    } catch (err) {
+      console.error('Could not access GitHub repo');
+      console.error(err);
+      process.exit(1);
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+
+  /**
    * Get a list of all GitHub milestones currently in new repo
    */
   async getAllGithubMilestones() {
     try {
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
       // get an array of GitHub milestones for the new repo
       let result = await this.githubApi.issues.listMilestonesForRepo({
         owner: this.githubOwner,
@@ -70,7 +95,7 @@ export default class GithubHelper {
     const perPage = 100;
 
     while (true) {
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
       // get a paginated list of issues
       const issues = await this.githubApi.issues.listForRepo({
         owner: this.githubOwner,
@@ -104,7 +129,7 @@ export default class GithubHelper {
    */
   async getAllGithubLabelNames() {
     try {
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
       // get an array of GitHub labels for the new repo
       let result = await this.githubApi.issues.listLabelsForRepo({
         owner: this.githubOwner,
@@ -134,7 +159,7 @@ export default class GithubHelper {
     const perPage = 100;
 
     while (true) {
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
       // get a paginated list of pull requests
       const pullRequests = await this.githubApi.pulls.list({
         owner: this.githubOwner,
@@ -237,7 +262,7 @@ export default class GithubHelper {
     if (props.body && props.body.indexOf('/uploads/') > -1 && !settings.s3) {
       props.labels.push('has attachment');
     }
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) return Promise.resolve({ data: issue });
     // create the GitHub issue from the GitLab issue
@@ -328,7 +353,7 @@ export default class GithubHelper {
     } else {
       let bodyConverted = await this.convertIssuesAndComments(note.body, note);
 
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
 
       if (settings.debug) {
         return true;
@@ -366,7 +391,7 @@ export default class GithubHelper {
       state: issue.state,
     };
 
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) {
       return Promise.resolve();
@@ -394,7 +419,7 @@ export default class GithubHelper {
       githubMilestone.due_on = milestone.due_date + 'T00:00:00Z';
     }
 
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) return Promise.resolve();
     // create the GitHub milestone
@@ -415,7 +440,7 @@ export default class GithubHelper {
       color: label.color.substr(1), // remove leading "#" because gitlab returns it but github wants the color without it
     };
 
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) return Promise.resolve();
     // create the GitHub label
@@ -527,7 +552,7 @@ export default class GithubHelper {
         base: pullRequest.target_branch,
       };
 
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
 
       // create the GitHub pull request from the GitLab issue
       return this.githubApi.pulls.create(props);
@@ -701,7 +726,7 @@ export default class GithubHelper {
       state: pullRequest.state,
     };
 
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) {
       return Promise.resolve();
@@ -773,7 +798,7 @@ export default class GithubHelper {
       );
 
       if (settings.s3) {
-        strWithMigLine = await utils.migrateAttachments(strWithMigLine, settings.s3, this.gitlabHelper);
+        strWithMigLine = await utils.migrateAttachments(strWithMigLine, this.repoId, settings.s3, this.gitlabHelper);
       }
 
       return strWithMigLine;

@@ -33,7 +33,7 @@ export const generateUserProjectRegex = () => {
 };
 
 // Creates new attachments and replaces old links
-export const migrateAttachments = async (body: string, s3: S3Settings, gitlabHelper: GitlabHelper) => {
+export const migrateAttachments = async (body: string, githubRepoId: number | undefined, s3: S3Settings, gitlabHelper: GitlabHelper) => {
   const regexp = /!\[([^\]]+)\]\((\/uploads[^)]+)\)/g;
 
   // Maps link offset to a new name in S3
@@ -56,16 +56,17 @@ export const migrateAttachments = async (body: string, s3: S3Settings, gitlabHel
     // Generate new random file name for S3 bucket
     const id = crypto.randomBytes(16).toString('hex');
     const newFileName = id + extension;
+    const relativePath = githubRepoId ? `${githubRepoId}/${newFileName}` : newFileName;
 
     // Doesn't seem like it is easy to upload an issue to github, so upload to S3
     //https://stackoverflow.com/questions/41581151/how-to-upload-an-image-to-use-in-issue-comments-via-github-api
 
-    const s3url = `https://${s3.bucket}.s3.amazonaws.com/${newFileName}`;
+    const s3url = `https://${s3.bucket}.s3.amazonaws.com/${relativePath}`;
 
     const s3bucket = new S3();
     s3bucket.createBucket(() => {
       const params: S3.PutObjectRequest = {
-        Key: newFileName, //file.name doesn't exist as a property
+        Key: relativePath,
         Body: attachmentBuffer,
         ContentType: mimeType === false ? null : mimeType,
         Bucket: s3.bucket,

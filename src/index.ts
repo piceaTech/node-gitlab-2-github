@@ -121,6 +121,9 @@ async function migrate() {
   //
 
   try {
+
+    await githubHelper.registerRepoId();
+
     // transfer GitLab milestones to GitHub
     await transferMilestones();
 
