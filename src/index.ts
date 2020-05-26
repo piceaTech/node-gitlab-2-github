@@ -1,10 +1,14 @@
 import GithubHelper from './githubHelper';
 import GitlabHelper from './gitlabHelper';
+import settings from '../settings';
 
-const GitHubApi = require('@octokit/rest');
-const { Gitlab } = require('gitlab');
-const async = require('async');
-const fs = require('fs');
+import {Octokit as GitHubApi} from '@octokit/rest';
+import { Gitlab } from '@gitbeaker/node'
+
+import * as fs from 'fs';
+
+import AWS from 'aws-sdk';
+
 
 const issueCounters = {
   nrOfPlaceholderIssues: 0,
@@ -12,9 +16,14 @@ const issueCounters = {
   nrOfFailedIssues: 0,
 };
 
-let settings = null;
+if (settings.s3) {
+  AWS.config.accessKeyId = settings.s3.accessKeyId;
+  AWS.config.secretAccessKey = settings.s3.secretAccessKey;
+}
+
+//let settings = null;
 try {
-  settings = require('./settings.js');
+  //settings = require('../settings.js');
 } catch (e) {
   if (e.code === 'MODULE_NOT_FOUND') {
     console.log('\n\nPlease copy the sample_settings.js to settings.js.');
@@ -53,6 +62,7 @@ const githubApi = new GitHubApi({
     'user-agent': 'node-gitlab-2-github', // GitHub is happy with a unique user agent
     accept: 'application/vnd.github.v3+json',
   },
+  auth: 'token ' + settings.github.token,
 });
 
 const gitlabHelper = new GitlabHelper(gitlabApi, settings.gitlab);
@@ -72,7 +82,7 @@ if (!settings.gitlab.projectId) {
 /*
  * TODO description
  */
-function createPlaceholderIssue(expectedIdx) {
+function createPlaceholderIssue(expectedIdx: number) {
   return {
     iid: expectedIdx,
     title: `[PLACEHOLDER ISSUE] - for issue #${expectedIdx}`,
@@ -106,11 +116,6 @@ function createReplacementIssue(id, title, state) {
  * Performs all of the migration tasks to move a GitLab repo to GitHub
  */
 async function migrate() {
-  githubApi.authenticate({
-    type: 'token',
-    token: settings.github.token,
-  });
-
   //
   // Sequentially transfer repo things
   //
@@ -232,6 +237,8 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
 async function transferIssues() {
   inform('Transferring Issues');
 
+  await gitlabHelper. registerProjectPath(settings.gitlab.projectId);
+
   // Because each
   let milestoneData = await githubHelper.getAllGithubMilestones();
 
@@ -239,7 +246,7 @@ async function transferIssues() {
   // TODO return all issues via pagination
   let issues = await gitlabApi.Issues.all({
     projectId: settings.gitlab.projectId,
-  });
+  }) as any[];
 
   // sort issues in ascending order of their issue number (by iid)
   issues = issues.sort((a, b) => a.iid - b.iid);
@@ -355,7 +362,7 @@ async function transferMergeRequests() {
   // this project
   let mergeRequests = await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
-  });
+  }) as any;
 
   // Sort merge requests in ascending order of their number (by iid)
   mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
@@ -437,7 +444,7 @@ async function logMergeRequests(logFile) {
   // TODO return all MRs via pagination
   let mergeRequests = await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
-  });
+  }) as any;
 
   // sort MRs in ascending order of when they were created (by id)
   mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);
@@ -446,12 +453,13 @@ async function logMergeRequests(logFile) {
 
   for (let mergeRequest of mergeRequests) {
     let mergeRequestDiscussions = await gitlabApi.MergeRequestDiscussions.all(
-      projectId,
+      settings.gitlab.projectId,
       mergeRequest.iid
     );
     let mergeRequestNotes = await gitlabApi.MergeRequestNotes.all(
-      projectId,
-      mergeRequest.iid
+      settings.gitlab.projectId,
+      mergeRequest.iid,
+      {}
     );
 
     mergeRequest.discussions = mergeRequestDiscussions

@@ -36,11 +36,11 @@ After doing this, the autolinking of issues, commits, and branches will work. Se
 
 The user must be a member of the project you want to copy or else you won't see it in the first step.
 
-1. `cp sample_settings.js settings.js`
-1. edit settings.js
+1. `cp sample_settings.ts settings.ts`
+1. edit settings.ts
 1. run `npm run start`
 
-## Where to find info for the `settings.js`
+## Where to find info for the `settings.ts`
 
 ### gitlab
 
@@ -50,7 +50,7 @@ The URL under which your gitlab instance is hosted. Default is the official `htt
 
 #### gitlab.token
 
-Go to [Settings / Access Tokens](https://gitlab.com/profile/personal_access_tokens). Create a new Access Token with `api` and `read_repository` scopes and copy that into the `settings.js`
+Go to [Settings / Access Tokens](https://gitlab.com/profile/personal_access_tokens). Create a new Access Token with `api` and `read_repository` scopes and copy that into the `settings.ts`
 
 #### gitlab.projectID
 
@@ -68,15 +68,29 @@ Under which organisation or user will the new project be hosted
 
 #### github.token
 
-Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token with `repo` scope and copy that into the `settings.js`
+Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token with `repo` scope and copy that into the `settings.ts`
 
 #### github.repo
 
 What is the name of the new repo
 
+### s3 (optional)
+
+S3 can be used to store attachments from issues. If omitted, `has attachment` label will be added to GitHub issue.
+
+#### s3.accessKeyId and s3.secretAccessKey
+
+AWS [credentials](https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys) that are used to copy attachments from GitLab into the S3 bucket.
+
+IAM User who owns these credential must have [write permissions](https://docs.aws.amazon.com/AmazonS3/latest/dev/example-policies-s3.html#iam-policy-ex0) to the bucket.
+
+#### s3.bucket
+
+Existing bucket, with an appropriate security policy. One possible policy is to allow [public access](https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteAccessPermissionsReqd.html).
+
 #### debug
 
-As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlabb side to test for wonky cases before using up api-calls
+As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls
 
 #### usePlaceholderIssuesForMissingIssues
 
