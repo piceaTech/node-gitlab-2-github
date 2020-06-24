@@ -1,9 +1,14 @@
 import * as settings from './settings';
 import utils from './utils';
 
+const gitHubLocation = 'https://github.com';
+
 export default class GithubHelper {
   constructor(githubApi, githubSettings, gitlabHelper) {
     this.githubApi = githubApi;
+    this.githubUrl = githubSettings.baseUrl
+      ? githubSettings.baseUrl
+      : gitHubLocation;
     this.githubOwner = githubSettings.owner;
     this.githubToken = githubSettings.token;
     this.githubRepo = githubSettings.repo;
@@ -729,17 +734,18 @@ export default class GithubHelper {
    */
 
   convertIssuesAndComments(str, item) {
+    const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
     if (
       (!settings.usermap || Object.keys(settings.usermap).length === 0) &&
       (!settings.projectmap || Object.keys(settings.projectmap).length === 0)
     ) {
-      return GithubHelper.addMigrationLine(str, item);
+      return GithubHelper.addMigrationLine(str, item, repoLink);
     } else {
       // - Replace userids as defined in settings.usermap.
       //   They all start with '@' in the issues but we have them without in usermap
       // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
       //   They all have a '#' right after the project name in the issues but we have them without in projectmap
-      let strWithMigLine = GithubHelper.addMigrationLine(str, item);
+      let strWithMigLine = GithubHelper.addMigrationLine(str, item, repoLink);
 
       strWithMigLine = strWithMigLine.replace(
         this.userProjectRegex,
@@ -770,7 +776,7 @@ export default class GithubHelper {
    * Adds a line of text at the beginning of a comment that indicates who, when
    * and from GitLab.
    */
-  static addMigrationLine(str, item) {
+  static addMigrationLine(str, item, repoLink) {
     if (!item || !item.author || !item.author.username || !item.created_at) {
       return str;
     }
@@ -789,6 +795,57 @@ export default class GithubHelper {
       dateformatOptions
     );
 
-    return `In GitLab by @${item.author.username} on ${formattedDate}\n\n${str}`;
+    const attribution = `In GitLab by @${item.author.username} on ${formattedDate}`;
+    const lineRef =
+      item && item.position
+        ? GithubHelper.createLineRef(item.position, repoLink)
+        : '';
+    const summary = attribution + (lineRef ? `\n\n${lineRef}` : '');
+
+    return `${summary}\n\n${str}`;
+  }
+
+  /**
+   * When migrating in-line comments to GitHub then creates a link to the
+   * appropriate line of the diff.
+   */
+  static createLineRef(position, repoLink) {
+    if (
+      !repoLink ||
+      !repoLink.startsWith(gitHubLocation) ||
+      !position ||
+      !position.head_sha
+    ) {
+      return '';
+    }
+    const base_sha = position.base_sha;
+    const head_sha = position.head_sha;
+    var path = '';
+    var line = '';
+    var slug = '';
+    if (
+      (position.new_line && position.new_path) ||
+      (position.old_line && position.old_path)
+    ) {
+      var side;
+      if (!position.old_line || !position.old_path) {
+        side = 'R';
+        path = position.new_path;
+        line = position.new_line;
+      } else {
+        side = 'L';
+        path = position.old_path;
+        line = position.old_line;
+      }
+      const crypto = require('crypto');
+      const hash = crypto
+        .createHash('md5')
+        .update(path)
+        .digest('hex');
+      slug = `#diff-${hash}${side}${line}`;
+    }
+    // Mention the file and line number. If we can't get this for some reason then use the commit id instead.
+    const ref = path && line ? `${path} line ${line}` : `${head_sha}`;
+    return `Commented on [${ref}](${repoLink}/compare/${base_sha}..${head_sha}${slug})\n\n`;
   }
 }
