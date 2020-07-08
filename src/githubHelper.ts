@@ -69,7 +69,7 @@ export default class GithubHelper {
     try {
       await utils.sleep(this.delayInMs);
       // get an array of GitHub milestones for the new repo
-      let result = await this.githubApi.issues.listMilestonesForRepo({
+      let result = await this.githubApi.issues.listMilestones({
         owner: this.githubOwner,
         repo: this.githubRepo,
         state: 'all',
