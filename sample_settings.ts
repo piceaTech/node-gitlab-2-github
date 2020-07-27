@@ -1,4 +1,6 @@
-module.exports = {
+import Settings from './src/settings';
+
+export default {
   gitlab: {
     // url: 'https://gitlab.mycompany.com',
     token: '{{gitlab private token}}',
@@ -9,6 +11,11 @@ module.exports = {
     owner: '{{repository owner (user or organization)}}',
     token: '{{token}}',
     repo: '{{repo}}',
+  },
+  s3: {
+    accessKeyId: '{{accessKeyId}}',
+    secretAccessKey: '{{secretAccessKey}}',
+    bucket: 'my-gitlab-bucket',
   },
   usermap: {
     'username.gitlab.1': 'username.github.1',
@@ -29,4 +36,4 @@ module.exports = {
     logFile: './merge-requests.json',
     log: false,
   },
-};
+} as Settings;

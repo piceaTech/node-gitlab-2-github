@@ -1,0 +1,25 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Node: Launch",
+      "env": { "TS_NODE_PROJECT": "tsconfig.dev.json" },
+      "runtimeExecutable": "node",
+      "args": [
+        "--inspect",
+        "-r",
+        "ts-node/register/type-check",
+        "-r",
+        "tsconfig-paths/register",
+        "src/index.ts"
+      ],
+      "protocol": "inspector",
+      "sourceMaps": true
+    }
+  ]
+}

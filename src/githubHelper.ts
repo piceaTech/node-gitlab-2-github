@@ -1,10 +1,25 @@
-import * as settings from './settings';
-import utils from './utils';
+import settings from '../settings';
+import { GithubSettings } from './settings';
+import * as utils from './utils';
+import {Octokit as GitHubApi, RestEndpointMethodTypes} from '@octokit/rest';
+import { IssuesListForRepoResponseData, PullsListResponseData } from "@octokit/types";
+import GitlabHelper from './gitlabHelper';
 
 const gitHubLocation = 'https://github.com';
 
 export default class GithubHelper {
-  constructor(githubApi, githubSettings, gitlabHelper) {
+  githubApi: GitHubApi;
+  githubUrl: string;
+  githubOwner: string;
+  githubToken: string;
+  githubRepo: string;
+  githubTimeout?: number;
+  gitlabHelper: GitlabHelper;
+  userProjectRegex: RegExp;
+  repoId?: number;
+  delayInMs: number;
+
+  constructor(githubApi: GitHubApi, githubSettings: GithubSettings, gitlabHelper: GitlabHelper) {
     this.githubApi = githubApi;
     this.githubUrl = githubSettings.baseUrl
       ? githubSettings.baseUrl
@@ -16,6 +31,7 @@ export default class GithubHelper {
     this.gitlabHelper = gitlabHelper;
     // regex for converting user from GitLab to GitHub
     this.userProjectRegex = utils.generateUserProjectRegex();
+    this.delayInMs = 2000;
   }
 
   /*
@@ -25,13 +41,35 @@ export default class GithubHelper {
    */
 
   /**
+   * Store the new repo id
+   */
+  async registerRepoId() {
+    try {
+      await utils.sleep(this.delayInMs);
+      // get an array of GitHub milestones for the new repo
+      let result = await this.githubApi.repos.get({
+        owner: this.githubOwner,
+        repo: this.githubRepo
+      });
+
+      this.repoId = result.data.id;
+    } catch (err) {
+      console.error('Could not access GitHub repo');
+      console.error(err);
+      process.exit(1);
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+
+  /**
    * Get a list of all GitHub milestones currently in new repo
    */
   async getAllGithubMilestones() {
     try {
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
       // get an array of GitHub milestones for the new repo
-      let result = await this.githubApi.issues.listMilestonesForRepo({
+      let result = await this.githubApi.issues.listMilestones({
         owner: this.githubOwner,
         repo: this.githubRepo,
         state: 'all',
@@ -58,12 +96,12 @@ export default class GithubHelper {
    * This uses a while loop to make sure that each page of issues is received.
    */
   async getAllGithubIssues() {
-    let allIssues = [];
+    let allIssues: IssuesListForRepoResponseData = [];
     let page = 1;
     const perPage = 100;
 
     while (true) {
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
       // get a paginated list of issues
       const issues = await this.githubApi.issues.listForRepo({
         owner: this.githubOwner,
@@ -97,7 +135,7 @@ export default class GithubHelper {
    */
   async getAllGithubLabelNames() {
     try {
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
       // get an array of GitHub labels for the new repo
       let result = await this.githubApi.issues.listLabelsForRepo({
         owner: this.githubOwner,
@@ -122,12 +160,12 @@ export default class GithubHelper {
    * This uses a while loop to make sure that each page of issues is received.
    */
   async getAllGithubPullRequests() {
-    let allPullRequests = [];
+    let allPullRequests: PullsListResponseData = [];
     let page = 1;
     const perPage = 100;
 
     while (true) {
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
       // get a paginated list of pull requests
       const pullRequests = await this.githubApi.pulls.list({
         owner: this.githubOwner,
@@ -166,9 +204,9 @@ export default class GithubHelper {
    * TODO description
    */
   async createIssue(milestones, issue) {
-    let bodyConverted = this.convertIssuesAndComments(issue.description, issue);
+    let bodyConverted = await this.convertIssuesAndComments(issue.description, issue);
 
-    let props = {
+    let props : RestEndpointMethodTypes["issues"]["create"]["parameters"] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
       title: issue.title.trim(),
@@ -227,10 +265,10 @@ export default class GithubHelper {
 
     // if the issue contains a url that contains "/uploads/", it is likely to
     // have an attachment. Therefore, add the "has attachment" label.
-    if (props.body && props.body.indexOf('/uploads/') > -1) {
+    if (props.body && props.body.indexOf('/uploads/') > -1 && !settings.s3) {
       props.labels.push('has attachment');
     }
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) return Promise.resolve({ data: issue });
     // create the GitHub issue from the GitLab issue
@@ -319,9 +357,9 @@ export default class GithubHelper {
       // note will be skipped
       return false;
     } else {
-      let bodyConverted = this.convertIssuesAndComments(note.body, note);
+      let bodyConverted = await this.convertIssuesAndComments(note.body, note);
 
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
 
       if (settings.debug) {
         return true;
@@ -331,7 +369,7 @@ export default class GithubHelper {
         .createComment({
           owner: this.githubOwner,
           repo: this.githubRepo,
-          number: githubIssue.number,
+          issue_number: githubIssue.number,
           body: bodyConverted,
         })
         .catch(x => {
@@ -352,14 +390,14 @@ export default class GithubHelper {
     // default state is open so we don't have to update if the issue is closed.
     if (issue.state !== 'closed' || githubIssue.state === 'closed') return;
 
-    let props = {
+    let props: RestEndpointMethodTypes["issues"]["update"]["parameters"] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      number: githubIssue.number,
+      issue_number: githubIssue.number,
       state: issue.state,
     };
 
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) {
       return Promise.resolve();
@@ -375,7 +413,7 @@ export default class GithubHelper {
    */
   async createMilestone(milestone) {
     // convert from GitLab to GitHub
-    let githubMilestone = {
+    let githubMilestone : RestEndpointMethodTypes["issues"]["createMilestone"]["parameters"] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
       title: milestone.title,
@@ -387,7 +425,7 @@ export default class GithubHelper {
       githubMilestone.due_on = milestone.due_date + 'T00:00:00Z';
     }
 
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) return Promise.resolve();
     // create the GitHub milestone
@@ -408,7 +446,7 @@ export default class GithubHelper {
       color: label.color.substr(1), // remove leading "#" because gitlab returns it but github wants the color without it
     };
 
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) return Promise.resolve();
     // create the GitHub label
@@ -505,7 +543,7 @@ export default class GithubHelper {
     if (settings.debug) return Promise.resolve({ data: pullRequest });
 
     if (canCreate) {
-      let bodyConverted = this.convertIssuesAndComments(
+      let bodyConverted = await this.convertIssuesAndComments(
         pullRequest.description,
         pullRequest
       );
@@ -520,7 +558,7 @@ export default class GithubHelper {
         base: pullRequest.target_branch,
       };
 
-      await utils.sleep(2000);
+      await utils.sleep(this.delayInMs);
 
       // create the GitHub pull request from the GitLab issue
       return this.githubApi.pulls.create(props);
@@ -532,7 +570,7 @@ export default class GithubHelper {
         ' -> ' +
         pullRequest.target_branch +
         '_\n\n';
-      let bodyConverted = this.convertIssuesAndComments(
+      let bodyConverted = await this.convertIssuesAndComments(
         mergeStr + pullRequest.description,
         pullRequest
       );
@@ -608,10 +646,10 @@ export default class GithubHelper {
    * @returns {Promise<Github.Response<Github.IssuesUpdateResponse>>}
    */
   async updatePullRequestData(githubPullRequest, pullRequest, milestones) {
-    let props = {
+    let props: RestEndpointMethodTypes["issues"]["update"]["parameters"] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      number: githubPullRequest.number || githubPullRequest.iid,
+      issue_number: githubPullRequest.number || githubPullRequest.iid,
     };
 
     //
@@ -687,14 +725,14 @@ export default class GithubHelper {
     if (pullRequest.state !== 'closed' || githubPullRequest.state === 'closed')
       return;
 
-    let props = {
+    let props : RestEndpointMethodTypes["issues"]["update"]["parameters"] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      number: githubPullRequest.number,
+      issue_number: githubPullRequest.number,
       state: pullRequest.state,
     };
 
-    await utils.sleep(2000);
+    await utils.sleep(this.delayInMs);
 
     if (settings.debug) {
       return Promise.resolve();
@@ -733,7 +771,7 @@ export default class GithubHelper {
    * - Change username from GitLab to GitHub in "mentions" (@username)
    */
 
-  convertIssuesAndComments(str, item) {
+  async convertIssuesAndComments(str: string, item: any) {
     const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
     if (
       (!settings.usermap || Object.keys(settings.usermap).length === 0) &&
@@ -766,6 +804,10 @@ export default class GithubHelper {
         }
       );
 
+      if (settings.s3) {
+        strWithMigLine = await utils.migrateAttachments(strWithMigLine, this.repoId, settings.s3, this.gitlabHelper);
+      }
+
       return strWithMigLine;
     }
   }
@@ -776,7 +818,7 @@ export default class GithubHelper {
    * Adds a line of text at the beginning of a comment that indicates who, when
    * and from GitLab.
    */
-  static addMigrationLine(str, item, repoLink) {
+  static addMigrationLine(str: string, item: any, repoLink: string): string {
     if (!item || !item.author || !item.author.username || !item.created_at) {
       return str;
     }
