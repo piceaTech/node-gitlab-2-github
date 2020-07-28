@@ -102,6 +102,11 @@ If this is set to true (default) then the migration process will automatically c
 
 It would of course be better to find the cause for migration fails, so that no replacement issues would be needed. Finding the cause together with a retry-mechanism would be optimal, and will maybe come in the future - currently the replacement-issue-mechanism helps to keep things in order.
 
+#### useIssuesForAllMergeRequests
+
+If this is set to true (default is false) then all merge requests will be migrated as GitHub issues (rather than pull requests). This can be
+used to sidestep the problem where pull requests are rejected by GitHub if the feature branch no longer exists or has been merged.
+
 #### skipMatchingComments
 
 This is an array (empty per default) that may contain string values. Any note/comment in any issue, that contains one or more of those string values, will be skipped (meaining not migrated). Note that this is case insensitive, therefore the string value `foo` would also lead to skipping notes containing a (sub)string `FOO`.

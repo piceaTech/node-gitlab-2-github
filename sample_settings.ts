@@ -31,6 +31,7 @@ export default {
   debug: false,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
+  useIssuesForAllMergeRequests: false,
   skipMatchingComments: [],
   mergeRequests: {
     logFile: './merge-requests.json',
