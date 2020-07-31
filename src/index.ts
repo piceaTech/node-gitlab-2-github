@@ -66,7 +66,10 @@ const githubApi = new GitHubApi({
 });
 
 const gitlabHelper = new GitlabHelper(gitlabApi, settings.gitlab);
-const githubHelper = new GithubHelper(githubApi, settings.github, gitlabHelper);
+const githubHelper = new GithubHelper(githubApi,
+                                      settings.github,
+                                      gitlabHelper,
+                                      settings.useIssuesForAllMergeRequests);
 
 // If no project id is given in settings.js, just return
 // all of the projects that this user is associated with.

@@ -18,8 +18,12 @@ export default class GithubHelper {
   userProjectRegex: RegExp;
   repoId?: number;
   delayInMs: number;
+  useIssuesForAllMergeRequests: boolean;
 
-  constructor(githubApi: GitHubApi, githubSettings: GithubSettings, gitlabHelper: GitlabHelper) {
+  constructor(githubApi: GitHubApi,
+              githubSettings: GithubSettings,
+              gitlabHelper: GitlabHelper,
+              useIssuesForAllMergeRequests: boolean) {
     this.githubApi = githubApi;
     this.githubUrl = githubSettings.baseUrl
       ? githubSettings.baseUrl
@@ -32,6 +36,7 @@ export default class GithubHelper {
     // regex for converting user from GitLab to GitHub
     this.userProjectRegex = utils.generateUserProjectRegex();
     this.delayInMs = 2000;
+    this.useIssuesForAllMergeRequests = useIssuesForAllMergeRequests;
   }
 
   /*
@@ -492,51 +497,55 @@ export default class GithubHelper {
    * @returns {Promise<Promise<{data: null}>|Promise<Github.Response<Github.PullsCreateResponse>>|Promise<{data: *}>>}
    */
   async createPullRequest(pullRequest) {
-    let canCreate = true;
+    let canCreate = !this.useIssuesForAllMergeRequests;
 
-    // Check to see if the target branch exists in GitHub - if it does not exist, we cannot create a pull request
-    try {
-      await this.githubApi.repos.getBranch({
-        owner: this.githubOwner,
-        repo: this.githubRepo,
-        branch: pullRequest.target_branch,
-      });
-    } catch (err) {
-      let gitlabBranches = await this.gitlabHelper.getAllBranches();
-      if (gitlabBranches.find(m => m.name === pullRequest.target_branch)) {
-        // Need to move that branch over to GitHub!
-        console.error(
-          `The '${pullRequest.target_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${pullRequest.iid}.`
-        );
-        return Promise.resolve({ data: null });
-      } else {
-        console.error(
-          `Merge request ${pullRequest.iid} (target branch '${pullRequest.target_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
-        );
-        canCreate = false;
+    if (canCreate) {
+      // Check to see if the target branch exists in GitHub - if it does not exist, we cannot create a pull request
+      try {
+        await this.githubApi.repos.getBranch({
+          owner: this.githubOwner,
+          repo: this.githubRepo,
+          branch: pullRequest.target_branch,
+        });
+      } catch (err) {
+        let gitlabBranches = await this.gitlabHelper.getAllBranches();
+        if (gitlabBranches.find(m => m.name === pullRequest.target_branch)) {
+          // Need to move that branch over to GitHub!
+          console.error(
+            `The '${pullRequest.target_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${pullRequest.iid}.`
+          );
+          return Promise.resolve({ data: null });
+        } else {
+          console.error(
+            `Merge request ${pullRequest.iid} (target branch '${pullRequest.target_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
+          );
+          canCreate = false;
+        }
       }
     }
 
-    // Check to see if the source branch exists in GitHub - if it does not exist, we cannot create a pull request
-    try {
-      await this.githubApi.repos.getBranch({
-        owner: this.githubOwner,
-        repo: this.githubRepo,
-        branch: pullRequest.source_branch,
-      });
-    } catch (err) {
-      let gitlabBranches = await this.gitlabHelper.getAllBranches();
-      if (gitlabBranches.find(m => m.name === pullRequest.source_branch)) {
-        // Need to move that branch over to GitHub!
-        console.error(
-          `The '${pullRequest.source_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${pullRequest.iid}.`
-        );
-        return Promise.resolve({ data: null });
-      } else {
-        console.error(
-          `Pull request #${pullRequest.iid} (source branch '${pullRequest.source_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
-        );
-        canCreate = false;
+    if (canCreate) {
+      // Check to see if the source branch exists in GitHub - if it does not exist, we cannot create a pull request
+      try {
+        await this.githubApi.repos.getBranch({
+          owner: this.githubOwner,
+          repo: this.githubRepo,
+          branch: pullRequest.source_branch,
+        });
+      } catch (err) {
+        let gitlabBranches = await this.gitlabHelper.getAllBranches();
+        if (gitlabBranches.find(m => m.name === pullRequest.source_branch)) {
+          // Need to move that branch over to GitHub!
+          console.error(
+            `The '${pullRequest.source_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${pullRequest.iid}.`
+          );
+          return Promise.resolve({ data: null });
+        } else {
+          console.error(
+            `Pull request #${pullRequest.iid} (source branch '${pullRequest.source_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
+          );
+          canCreate = false;
+        }
       }
     }
 
