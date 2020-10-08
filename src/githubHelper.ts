@@ -782,43 +782,46 @@ export default class GithubHelper {
 
   async convertIssuesAndComments(str: string, item: any) {
     const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
-    if (
-      (!settings.usermap || Object.keys(settings.usermap).length === 0) &&
-      (!settings.projectmap || Object.keys(settings.projectmap).length === 0)
-    ) {
-      return GithubHelper.addMigrationLine(str, item, repoLink);
-    } else {
-      // - Replace userids as defined in settings.usermap.
-      //   They all start with '@' in the issues but we have them without in usermap
-      // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
-      //   They all have a '#' right after the project name in the issues but we have them without in projectmap
-      let strWithMigLine = GithubHelper.addMigrationLine(str, item, repoLink);
-
-      strWithMigLine = strWithMigLine.replace(
-        this.userProjectRegex,
-        matched => {
-          if (matched.startsWith('@')) {
-            // this is a userid
-            return '@' + settings.usermap[matched.substr(1)];
-          } else if (matched.endsWith('#')) {
-            // this is a cross-project issue reference
-            return (
-              settings.projectmap[matched.substring(0, matched.length - 1)] +
-              '#'
-            );
-          } else {
-            // something went wrong, do nothing
-            return matched;
-          }
+    let strWithMigLine = GithubHelper.addMigrationLine(str, item, repoLink);
+				   
+    // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
+    //   They all have a '#' right after the project name in the issues but we have them without in projectmap
+    strWithMigLine = strWithMigLine.replace(
+      this.userProjectRegex,
+      matched => {
+        if (matched.endsWith('#')) {
+          // this is a cross-project issue reference
+          return (
+            settings.projectmap[matched.substring(0, matched.length - 1)] +
+            '#'
+          );
+        } else {
+          // something went wrong, do nothing
+          return matched;
         }
-      );
-
-      if (settings.s3) {
-        strWithMigLine = await utils.migrateAttachments(strWithMigLine, this.repoId, settings.s3, this.gitlabHelper);
       }
+    );
 
-      return strWithMigLine;
+    // - Replace userids with links back to the gitlab user
+    let generic_username_regex = new RegExp('@[A-Za-z0-9-_]*', 'g');
+    strWithMigLine = strWithMigLine.replace(
+      generic_username_regex,
+      matched => {
+        if (matched.startsWith('@')) {
+          // this is a userid
+          return '[[Gitlab user @' + matched.substr(1) + ']](https://gitlab.com/' + matched.substr(1) + ')';
+        } else {
+          // something went wrong, do nothing
+          return matched;
+        }
+      }
+    );
+
+    if (settings.s3) {
+      strWithMigLine = await utils.migrateAttachments(strWithMigLine, this.repoId, settings.s3, this.gitlabHelper);
     }
+
+    return strWithMigLine;
   }
 
   // ----------------------------------------------------------------------------
