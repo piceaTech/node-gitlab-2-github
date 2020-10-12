@@ -16,9 +16,6 @@ export const sleep = (milliseconds: number) => {
  */
 export const generateUserProjectRegex = () => {
   let reString = '';
-  if (settings.usermap !== null && Object.keys(settings.usermap).length > 0) {
-    reString = '@' + Object.keys(settings.usermap).join('|@');
-  }
   if (
     settings.projectmap !== null &&
     Object.keys(settings.projectmap).length > 0
