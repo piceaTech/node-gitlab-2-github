@@ -209,7 +209,11 @@ export default class GithubHelper {
    * TODO description
    */
   async createIssue(milestones, issue) {
-    let bodyConverted = await this.convertIssuesAndComments(issue.description, issue);
+    let bodyConverted = '';
+    if (!issue.title.startsWith('[PLACEHOLDER ISSUE]')) {
+      bodyConverted = '[See original issue on GitLab](' + issue.web_url + ')\n';
+    }
+    bodyConverted += await this.convertIssuesAndComments(issue.description, issue);
 
     let props : RestEndpointMethodTypes["issues"]["create"]["parameters"] = {
       owner: this.githubOwner,
@@ -552,7 +556,8 @@ export default class GithubHelper {
     if (settings.debug) return Promise.resolve({ data: pullRequest });
 
     if (canCreate) {
-      let bodyConverted = await this.convertIssuesAndComments(
+      let bodyConverted = '[See original merge request on GitLab](' + pullRequest.web_url + ")\n";
+      bodyConverted += await this.convertIssuesAndComments(
         pullRequest.description,
         pullRequest
       );
