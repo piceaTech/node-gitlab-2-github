@@ -497,7 +497,7 @@ export default class GithubHelper {
    * @returns {Promise<Promise<{data: null}>|Promise<Github.Response<Github.PullsCreateResponse>>|Promise<{data: *}>>}
    */
   async createPullRequest(pullRequest) {
-    let canCreate = !this.useIssuesForAllMergeRequests;
+    let canCreate = (pullRequest.state === 'open')
 
     if (canCreate) {
       // Check to see if the target branch exists in GitHub - if it does not exist, we cannot create a pull request
@@ -517,7 +517,7 @@ export default class GithubHelper {
           return Promise.resolve({ data: null });
         } else {
           console.error(
-            `Merge request ${pullRequest.iid} (target branch '${pullRequest.target_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
+            `Merge request ${pullRequest.iid} (target branch '${pullRequest.target_branch}' does not exist => cannot migrate pull request, merge request will not be migrated to GitHub.`
           );
           canCreate = false;
         }
@@ -542,7 +542,7 @@ export default class GithubHelper {
           return Promise.resolve({ data: null });
         } else {
           console.error(
-            `Pull request #${pullRequest.iid} (source branch '${pullRequest.source_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
+            `Pull request #${pullRequest.iid} (source branch '${pullRequest.source_branch}' does not exist => cannot migrate pull request, merge request will not be migrated to GitHub.`
           );
           canCreate = false;
         }
@@ -572,28 +572,7 @@ export default class GithubHelper {
       // create the GitHub pull request from the GitLab issue
       return this.githubApi.pulls.create(props);
     } else {
-      // Create an issue with a descriptive title
-      let mergeStr =
-        '_Merges ' +
-        pullRequest.source_branch +
-        ' -> ' +
-        pullRequest.target_branch +
-        '_\n\n';
-      let bodyConverted = await this.convertIssuesAndComments(
-        mergeStr + pullRequest.description,
-        pullRequest
-      );
-      let props = {
-        owner: this.githubOwner,
-        repo: this.githubRepo,
-        title: pullRequest.title.trim() + ' - [' + pullRequest.state + ']',
-        body: bodyConverted,
-      };
-
-      // Add a label to indicate the issue is a merge request
-      pullRequest.labels.push('gitlab merge request');
-
-      return this.githubApi.issues.create(props);
+      return Promise.resolve({ data: null });
     }
   }
 
