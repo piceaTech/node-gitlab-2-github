@@ -222,24 +222,6 @@ export default class GithubHelper {
       body: bodyConverted,
     };
 
-    //
-    // Issue Assignee
-    //
-
-    // If the GitLab issue has an assignee, make sure to carry it over -- but only
-    // if the username is a valid GitHub username.
-    if (issue.assignee) {
-      props.assignees = [];
-      if (issue.assignee.username === settings.github.username) {
-        props.assignees.push(settings.github.username);
-      } else if (
-        settings.usermap &&
-        settings.usermap[issue.assignee.username]
-      ) {
-        // get GitHub username name from settings
-        props.assignees.push(settings.usermap[issue.assignee.username]);
-      }
-    }
 
     //
     // Issue Milestone
@@ -644,25 +626,6 @@ export default class GithubHelper {
       repo: this.githubRepo,
       issue_number: githubPullRequest.number || githubPullRequest.iid,
     };
-
-    //
-    // Pull Request Assignee
-    //
-
-    // If the GitLab merge request has an assignee, make sure to carry it over --
-    // but only if the username is a valid GitHub username
-    if (pullRequest.assignee) {
-      props.assignees = [];
-      if (pullRequest.assignee.username === settings.github.username) {
-        props.assignees.push(settings.github.username);
-      } else if (
-        settings.usermap &&
-        settings.usermap[pullRequest.assignee.username]
-      ) {
-        // Get GitHub username from settings
-        props.assignees.push(settings.usermap[pullRequest.assignee.username]);
-      }
-    }
 
     //
     // Pull Request Milestone
