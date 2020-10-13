@@ -206,13 +206,6 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
     labels.push(hasAttachmentLabel);
   }
 
-  // create gitlabMergeRequest label for non-migratable merge requests
-  const gitlabMergeRequestLabel = {
-    name: 'gitlab merge request',
-    color: '#b36b00',
-  };
-  labels.push(gitlabMergeRequestLabel);
-
   // if a GitLab label does not exist in GitHub repo, create it.
   for (let label of labels) {
     // GitHub prefers lowercase label names
