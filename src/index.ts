@@ -377,10 +377,6 @@ async function transferMergeRequests() {
   // be empty)
   let githubPullRequests = await githubHelper.getAllGithubPullRequests();
 
-  // get a list of the current issues in the new GitHub repo (likely to be empty)
-  // Issues are sometimes created from Gitlab merge requests. Avoid creating duplicates.
-  let githubIssues = await githubHelper.getAllGithubIssues();
-
   console.log(
     'Transferring ' + mergeRequests.length.toString() + ' merge requests'
   );
@@ -401,11 +397,7 @@ async function transferMergeRequests() {
     let githubRequest = githubPullRequests.find(
       i => i.title.trim() === request.title.trim()
     );
-    let githubIssue = githubIssues.find(
-      // allow for issues titled "Original Issue Name [merged]"
-      i => i.title.trim().includes(request.title.trim())
-    );
-    if (!githubRequest && !githubIssue) {
+    if (!githubRequest) {
       console.log(
         'Creating pull request: !' + request.iid + ' - ' + request.title
       );
@@ -430,13 +422,6 @@ async function transferMergeRequests() {
             request.title
         );
         githubHelper.updatePullRequestState(githubRequest, request);
-      } else {
-        console.log(
-          'Gitlab merge request already exists (as github issue): ' +
-            request.iid +
-            ' - ' +
-            request.title
-        );
       }
     }
   }
