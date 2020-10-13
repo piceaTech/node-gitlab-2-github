@@ -392,6 +392,10 @@ async function transferMergeRequests() {
   // if a GitLab merge request does not exist in GitHub repo, create it -- along
   // with comments
   for (let request of mergeRequests) {
+    // Skip pull requests that aren't open
+    if (request.state != 'opened'){
+      continue
+    }
     // Try to find a GitHub pull request that already exists for this GitLab
     // merge request
     let githubRequest = githubPullRequests.find(

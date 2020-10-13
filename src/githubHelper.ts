@@ -483,8 +483,7 @@ export default class GithubHelper {
    * @returns {Promise<Promise<{data: null}>|Promise<Github.Response<Github.PullsCreateResponse>>|Promise<{data: *}>>}
    */
   async createPullRequest(pullRequest) {
-    let canCreate = (pullRequest.state === 'open')
-
+    let canCreate = true;
     if (canCreate) {
       // Check to see if the target branch exists in GitHub - if it does not exist, we cannot create a pull request
       try {
