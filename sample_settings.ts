@@ -12,18 +12,9 @@ export default {
     token: '{{token}}',
     repo: '{{repo}}',
   },
-  s3: {
-    accessKeyId: '{{accessKeyId}}',
-    secretAccessKey: '{{secretAccessKey}}',
-    bucket: 'my-gitlab-bucket',
-  },
   usermap: {
-    'username.gitlab.1': 'username.github.1',
-    'username.gitlab.2': 'username.github.2',
   },
   projectmap: {
-    'gitlabgroup/projectname.1': 'GitHubOrg/projectname.1',
-    'gitlabgroup/projectname.2': 'GitHubOrg/projectname.2',
   },
   conversion: {
     useLowerCaseLabels: true,

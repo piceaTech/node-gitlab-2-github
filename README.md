@@ -1,9 +1,34 @@
 # node-gitlab-2-github
 
+## Fork Notes
+
+This project is a fork of https://github.com/piceaTech/node-gitlab-2-github,
+modified to meet the needs of the buildStream migration project. Notable changes
+include:
+
+- Only open merge requests are transferred
+  - In testing, we found that merged Merge Requests wouldn't migrate properly
+  - We decided that we did not want to migrate closed (non-merged) Merge
+    Requests
+- Merge Requests are never transferred as issues
+  - We decided that we didn't want merged merge requests to migrate as issues,
+    we would prefer they not migrate at all.
+- The setting for creating MRs as issues no longer does anything (but still
+  exists in the settings)
+- No longer creates the "gitlab merge request" label for issues
+- `Usermap` is not used for anything (but still exists in the settings)
+- @usernames are replaces with a link back to the original gitlab user's account
+  on gitlab. (This maintains an accurate link back to the original target, and
+  avoids creating @mention email spam for the gitHub user who was @mentioned.
+- The migrated issues and pull requests will not be assigned to anyone. If they
+  need to be assigned to somone, they will have to be reassigned manually. We
+  decided this was simpler than trying to create an accurate usermap for
+  everyone.
+
 ## Install
 
 1. You need nodejs and npm installed
-1. Clone this repo with `git clone https://github.com/piceaTech/node-gitlab-2-github.git`
+1. Clone this repo
 1. `cd node-gitlab-2-github`
 1. `npm i`
 
@@ -21,13 +46,6 @@ cd repo
 
 # Push to GitHub using the `--mirror` option.  The `--no-verify` option skips any hooks.
 git push --no-verify --mirror git@github.com:username/repo.git
-
-# Set push URL to the mirror location
-git remote set-url --push origin git@github.com:username/repo.git
-
-# To periodically update the repo on GitHub with what you have in GitLab
-git fetch -p origin
-git push --no-verify --mirror
 ```
 
 After doing this, the autolinking of issues, commits, and branches will work. See **Usage** for next steps.
@@ -104,8 +122,7 @@ It would of course be better to find the cause for migration fails, so that no r
 
 #### useIssuesForAllMergeRequests
 
-If this is set to true (default is false) then all merge requests will be migrated as GitHub issues (rather than pull requests). This can be
-used to sidestep the problem where pull requests are rejected by GitHub if the feature branch no longer exists or has been merged.
+_This setting no longer has any effect._
 
 #### skipMatchingComments
 
@@ -122,7 +139,9 @@ Object consisting of `logfile` and `log`. If `log` is set to true, then the merg
 
 ### usermap
 
-Maps the usernames from gitlab to github. If the assinee of the gitlab issue is equal to the one currently logged in github it will also get assigned without a usermap. The Mentions in issues will also be translated to the new github name.
+\*The usermap no longer has any effect on the scripts outputs. However, the
+script still expects the usermap to exist in the settings. The usermap in
+settings may be left as an empty map, but it should not be deleted entirely.
 
 ### projectmap
 
