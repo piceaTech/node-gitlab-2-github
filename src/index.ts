@@ -206,13 +206,6 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
     labels.push(hasAttachmentLabel);
   }
 
-  // create gitlabMergeRequest label for non-migratable merge requests
-  const gitlabMergeRequestLabel = {
-    name: 'gitlab merge request',
-    color: '#b36b00',
-  };
-  labels.push(gitlabMergeRequestLabel);
-
   // if a GitLab label does not exist in GitHub repo, create it.
   for (let label of labels) {
     // GitHub prefers lowercase label names
@@ -377,10 +370,6 @@ async function transferMergeRequests() {
   // be empty)
   let githubPullRequests = await githubHelper.getAllGithubPullRequests();
 
-  // get a list of the current issues in the new GitHub repo (likely to be empty)
-  // Issues are sometimes created from Gitlab merge requests. Avoid creating duplicates.
-  let githubIssues = await githubHelper.getAllGithubIssues();
-
   console.log(
     'Transferring ' + mergeRequests.length.toString() + ' merge requests'
   );
@@ -392,16 +381,16 @@ async function transferMergeRequests() {
   // if a GitLab merge request does not exist in GitHub repo, create it -- along
   // with comments
   for (let request of mergeRequests) {
+    // Skip pull requests that aren't open
+    if (request.state != 'opened'){
+      continue
+    }
     // Try to find a GitHub pull request that already exists for this GitLab
     // merge request
     let githubRequest = githubPullRequests.find(
       i => i.title.trim() === request.title.trim()
     );
-    let githubIssue = githubIssues.find(
-      // allow for issues titled "Original Issue Name [merged]"
-      i => i.title.trim().includes(request.title.trim())
-    );
-    if (!githubRequest && !githubIssue) {
+    if (!githubRequest) {
       console.log(
         'Creating pull request: !' + request.iid + ' - ' + request.title
       );
@@ -426,13 +415,6 @@ async function transferMergeRequests() {
             request.title
         );
         githubHelper.updatePullRequestState(githubRequest, request);
-      } else {
-        console.log(
-          'Gitlab merge request already exists (as github issue): ' +
-            request.iid +
-            ' - ' +
-            request.title
-        );
       }
     }
   }
