@@ -28,7 +28,7 @@
     "@gitbeaker/node": "^23.1.0",
     "@octokit/rest": "^18.0.0",
     "aws-sdk": "^2.712.0",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "mime-types": "^2.1.27",
     "ts-node": "^8.10.2"
   },
