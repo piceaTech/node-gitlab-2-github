@@ -88,6 +88,22 @@ IAM User who owns these credential must have [write permissions](https://docs.aw
 
 Existing bucket, with an appropriate security policy. One possible policy is to allow [public access](https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteAccessPermissionsReqd.html).
 
+#### transfer.milestones
+
+If this is set to true (default) then the migration process will transfer milestones. 
+
+#### transfer.labels
+
+If this is set to true (default) then the migration process will transfer labels.
+
+#### transfer.issues
+
+If this is set to true (default) then the migration process will transfer issues.
+
+#### transfer.mergeRequests
+
+If this is set to true (default) then the migration process will transfer merge requests.
+
 #### debug
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls
