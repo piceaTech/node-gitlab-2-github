@@ -11,6 +11,12 @@ export default interface Settings {
   conversion: {
     useLowerCaseLabels: boolean;
   };
+  transfer: {
+    milestones: boolean;
+    labels: boolean;
+    issues: boolean;
+    mergeRequests: boolean;
+  };
   usePlaceholderIssuesForMissingIssues: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;

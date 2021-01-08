@@ -28,6 +28,12 @@ export default {
   conversion: {
     useLowerCaseLabels: true,
   },
+  transfer: {
+    milestones: true,
+    labels: true,
+    issues: true,
+    mergeRequests: true,
+  },
   debug: false,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
