@@ -38,6 +38,7 @@ export default {
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,
+  filterByLabel: null,
   skipMatchingComments: [],
   mergeRequests: {
     logFile: './merge-requests.json',

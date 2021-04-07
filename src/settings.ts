@@ -20,6 +20,7 @@ export default interface Settings {
   usePlaceholderIssuesForMissingIssues: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;
+  filterByLabel: string | null;
   skipMatchingComments: string[];
   mergeRequests: {
     logFile: string;

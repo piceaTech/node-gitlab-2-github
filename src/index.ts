@@ -259,6 +259,7 @@ async function transferIssues() {
   // TODO return all issues via pagination
   let issues = await gitlabApi.Issues.all({
     projectId: settings.gitlab.projectId,
+    labels: settings.filterByLabel,
   }) as any[];
 
   // sort issues in ascending order of their issue number (by iid)
@@ -375,6 +376,7 @@ async function transferMergeRequests() {
   // this project
   let mergeRequests = await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
+    labels: settings.filterByLabel,
   }) as any;
 
   // Sort merge requests in ascending order of their number (by iid)
@@ -457,6 +459,7 @@ async function logMergeRequests(logFile) {
   // TODO return all MRs via pagination
   let mergeRequests = await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
+    labels: settings.filterByLabel,
   }) as any;
 
   // sort MRs in ascending order of when they were created (by id)
