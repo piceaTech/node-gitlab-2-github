@@ -569,32 +569,44 @@ export default class GithubHelper {
 
       await utils.sleep(this.delayInMs);
 
-      // create the GitHub pull request from the GitLab issue
-      return this.githubApi.pulls.create(props);
-    } else {
-      // Create an issue with a descriptive title
-      let mergeStr =
-        '_Merges ' +
-        pullRequest.source_branch +
-        ' -> ' +
-        pullRequest.target_branch +
-        '_\n\n';
-      let bodyConverted = await this.convertIssuesAndComments(
-        mergeStr + pullRequest.description,
-        pullRequest
-      );
-      let props = {
-        owner: this.githubOwner,
-        repo: this.githubRepo,
-        title: pullRequest.title.trim() + ' - [' + pullRequest.state + ']',
-        body: bodyConverted,
-      };
-
-      // Add a label to indicate the issue is a merge request
-      pullRequest.labels.push('gitlab merge request');
-
-      return this.githubApi.issues.create(props);
+      try {
+        // try to create the GitHub pull request from the GitLab issue
+        await this.githubApi.pulls.create(props);
+        return Promise.resolve({ data: null }); // need to return null promise for parent to wait on
+      } catch (err) {
+        if(err.status === 422) {
+          console.error(
+            `Pull request #${pullRequest.iid} - attempt to create has failed, assume '${pullRequest.source_branch}' has already been merged => cannot migrate pull request, creating an issue instead.`
+          );
+          // fall through to next section
+        } else {
+          throw (err);
+        }
+      }
     }
+
+    // Failing all else, create an issue with a descriptive title
+    let mergeStr =
+      '_Merges ' +
+      pullRequest.source_branch +
+      ' -> ' +
+      pullRequest.target_branch +
+      '_\n\n';
+    let bodyConverted = await this.convertIssuesAndComments(
+      mergeStr + pullRequest.description,
+      pullRequest
+    );
+    let props = {
+      owner: this.githubOwner,
+      repo: this.githubRepo,
+      title: pullRequest.title.trim() + ' - [' + pullRequest.state + ']',
+      body: bodyConverted,
+    };
+
+    // Add a label to indicate the issue is a merge request
+    pullRequest.labels.push('gitlab merge request');
+
+    return this.githubApi.issues.create(props);
   }
 
   // ----------------------------------------------------------------------------
