@@ -137,6 +137,13 @@ async function migrate() {
       await transferLabels(true, settings.conversion.useLowerCaseLabels);
     }
 
+
+    // transfer GitLab releases to GitHub
+    if (settings.transfer.releases) {
+      await transferReleases();
+    }
+
+
     // Transfer issues with their comments; do this before transferring the merge requests
     if (settings.transfer.issues) {
       await transferIssues();
@@ -149,6 +156,8 @@ async function migrate() {
         await transferMergeRequests();
       }
     }
+
+
   } catch (err) {
     console.error('Error during transfer:');
     console.error(err);
@@ -441,6 +450,63 @@ async function transferMergeRequests() {
             request.iid +
             ' - ' +
             request.title
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Transfer any releases that exist in GitLab that do not exist in GitHub
+ * Please note that due to github api restrictions, this only transfers the 
+ * name, description and tag name of the release. It sorts the releases chronologically
+ * and creates them on github one by one
+ * @returns {Promise<void>}
+ */
+ async function transferReleases() {
+  inform('Transferring Releases');
+
+  // Get a list of all releases associated with this project
+  let releases = await gitlabApi.Releases.all(settings.gitlab.projectId) as any;
+
+  // Sort releases in ascending order of their release date
+  releases = releases.sort((a, b) => {
+    return (new Date(a.released_at) as any) - (new Date(b.released_at) as any);
+  });
+
+  console.log(
+    'Transferring ' + releases.length.toString() + ' releases'
+  );
+
+  //
+  // Create GitHub release for each GitLab release
+  //
+
+  // if a GitLab release does not exist in GitHub repo, create it
+  for (let release of releases) {
+    // Try to find a GitHub pull request that already exists for this GitLab
+    // merge request
+    let githubRelease = await githubHelper.getReleaseByTag(release.tag_name);
+    
+    if (!githubRelease) {
+      console.log(
+        'Creating release: !' + release.name + ' - ' + release.tag_name
+      );
+      try {
+        // process asynchronous code in sequence
+        await githubHelper.createRelease(release.tag_name, release.name, release.description);
+      } catch (err) {
+        console.error(
+          'Could not create release: !' +
+          release.name + ' - ' + release.tag_name
+        );
+        console.error(err);
+      }
+    } else {
+      if (githubRelease) {
+        console.log(
+          'Gitlab release already exists (as github release): ' +
+          githubRelease.data.name + ' - ' + githubRelease.data.tag_name
         );
       }
     }

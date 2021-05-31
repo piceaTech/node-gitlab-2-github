@@ -160,6 +160,62 @@ export default class GithubHelper {
 
   // ----------------------------------------------------------------------------
 
+  
+  /**
+   * Gets a release by tag name
+   * @param tag {string} - the tag name to search a release for
+   * @returns 
+   */
+   async getReleaseByTag(tag) {
+    try {
+      await utils.sleep(this.delayInMs);
+      // get an existing release by tag name in github
+      let result = await this.githubApi.repos.getReleaseByTag({
+        owner: this.githubOwner,
+        repo: this.githubRepo,
+        tag: tag
+      });
+
+      return result;
+    } catch (err) {
+      console.error('No existing release for this tag on github');
+      return null;
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+
+  /**
+   * Creates a new release on github
+   * @param tag_name {string} - the tag name
+   * @param name {string} - title of the release
+   * @param body {string} - description for the release
+   */
+   async createRelease(
+    tag_name: string, 
+    name: string,
+    body: string) {
+    try {
+      await utils.sleep(this.delayInMs);
+      // get an array of GitHub labels for the new repo
+      let result = await this.githubApi.repos.createRelease({
+        owner: this.githubOwner,
+        repo: this.githubRepo,
+        tag_name,
+        name,
+        body,
+      });
+
+      return result;
+    } catch (err) {
+      console.error('Could not create release on github');
+      console.error(err);
+      return null;
+    }
+  }
+
+  // ----------------------------------------------------------------------------
+
   /**
    * Get a list of all the current GitHub pull requests.
    * This uses a while loop to make sure that each page of issues is received.
