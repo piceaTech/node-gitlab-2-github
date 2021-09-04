@@ -22,6 +22,7 @@ export default interface Settings {
   useIssuesForAllMergeRequests: boolean;
   filterByLabel: string | null;
   skipMatchingComments: string[];
+  timeout: number,
   mergeRequests: {
     logFile: string;
     log: boolean;

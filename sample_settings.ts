@@ -40,6 +40,7 @@ export default {
   useIssuesForAllMergeRequests: false,
   filterByLabel: null,
   skipMatchingComments: [],
+  timeout: 30000,
   mergeRequests: {
     logFile: './merge-requests.json',
     log: false,
