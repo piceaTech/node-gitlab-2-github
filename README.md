@@ -136,9 +136,25 @@ Suggested values:
 - `time spent`, since those kind of terms can be used in GitLab to track time, they are rather meaningless in Github though
 - action entries, such as `changed the description`, `added 1 commit`, `mentioned in merge request`, etc as they are interpreted as comments
 
+#### timeout
+
+Timeout when communicating with github
+
 #### mergeRequests
 
 Object consisting of `logfile` and `log`. If `log` is set to true, then the merge requests are logged in the specified file and not migrated. Conversely, if `log` is set to false, then the merge requests are migrated to GitHub and not logged. If the source or target branches linked to the merge request have been deleted, the merge request cannot be migrated to a pull request; instead, an issue with a custom "gitlab merge request" tag is created with the full comment history of the merge request.
+
+#### transferOnlyOpen
+
+If set to true (default false), only active milestones, open issues and open merge requests are migrated.
+
+#### createdAfter
+
+If provided (expected in ISO 8601 format,e.g. 2019-03-15T08:00:00Z), issues/milestones/MRs created after this date are migrated.
+
+#### updatedAfter
+
+If provided (expected in ISO 8601 format,e.g. 2019-03-15T08:00:00Z), issues/milestones/MRs updated after this date are migrated.
 
 ### usermap
 
