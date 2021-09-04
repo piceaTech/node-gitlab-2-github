@@ -33,7 +33,9 @@ export default {
     labels: true,
     issues: true,
     mergeRequests: true,
-    transferOnlyOpen: false
+    transferOnlyOpen: false,
+    createdAfter: null,
+    updatedAfter: '2000-01-01T00:00:00Z'
   },
   debug: false,
   usePlaceholderIssuesForMissingIssues: true,

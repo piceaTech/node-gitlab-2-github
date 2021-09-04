@@ -172,8 +172,19 @@ async function transferMilestones() {
 
   if(settings.transfer.transferOnlyOpen) {
       // filter active milestones
+    console.log('Transferring only open milestones');
     milestones = milestones.filter(milestone => milestone.state === "active")
   }
+
+   if (settings.transfer.createdAfter) {
+        console.log('Transferring milestones created after ' + settings.transfer.createdAfter);
+        milestones = milestones.filter(milestone => Date.parse(milestone.created_at) > Date.parse(settings.transfer.createdAfter));
+    }
+
+   if (settings.transfer.updatedAfter) {
+        console.log('Transferring milestones updated after ' + settings.transfer.updatedAfter);
+        milestones = milestones.filter(milestone => Date.parse(milestone.updated_at) > Date.parse(settings.transfer.updatedAfter));
+    }
 
   // sort milestones in ascending order of when they were created (by id)
   milestones = milestones.sort((a, b) => a.id - b.id);
@@ -269,7 +280,18 @@ async function transferIssues() {
 
   // filter issues to only get those in state 'opened'
    if (settings.transfer.transferOnlyOpen) {
+        console.log('Transferring only open issues');
         issues = issues.filter(issue => issue.state === 'opened');
+    }
+
+   if (settings.transfer.createdAfter) {
+        console.log('Transferring issues created after ' + settings.transfer.createdAfter);
+        issues = issues.filter(issue => Date.parse(issue.created_at) > Date.parse(settings.transfer.createdAfter));
+    }
+
+   if (settings.transfer.updatedAfter) {
+        console.log('Transferring issues updated after ' + settings.transfer.updatedAfter);
+        issues = issues.filter(issue => Date.parse(issue.updated_at) > Date.parse(settings.transfer.updatedAfter));
     }
 
   // sort issues in ascending order of their issue number (by iid)
@@ -391,7 +413,18 @@ async function transferMergeRequests() {
 
     // filter issues to only get those in state 'opened'
    if (settings.transfer.transferOnlyOpen) {
+        console.log('Transferring only open merge requests');
         mergeRequests = mergeRequests.filter(mergeRequest => mergeRequest.state === 'opened');
+    }
+
+   if (settings.transfer.createdAfter) {
+        console.log('Transferring merge requests created after ' + settings.transfer.createdAfter);
+        mergeRequests = mergeRequests.filter(mergeRequest => Date.parse(mergeRequest.created_at) > Date.parse(settings.transfer.createdAfter));
+    }
+
+   if (settings.transfer.updatedAfter) {
+        console.log('Transferring merge requests updated after ' + settings.transfer.updatedAfter);
+        mergeRequests = mergeRequests.filter(mergeRequest => Date.parse(mergeRequest.updated_at) > Date.parse(settings.transfer.updatedAfter));
     }
 
   // Sort merge requests in ascending order of their number (by iid)

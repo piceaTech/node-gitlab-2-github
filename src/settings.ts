@@ -17,6 +17,8 @@ export default interface Settings {
     issues: boolean;
     mergeRequests: boolean;
     transferOnlyOpen: boolean;
+    createdAfter: string;
+    updatedAfter: string;
   };
   usePlaceholderIssuesForMissingIssues: boolean;
   useReplacementIssuesForCreationFails: boolean;
