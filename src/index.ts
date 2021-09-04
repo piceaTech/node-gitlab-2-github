@@ -3,7 +3,7 @@ import GitlabHelper from './gitlabHelper';
 import settings from '../settings';
 
 import {Octokit as GitHubApi} from '@octokit/rest';
-import { Gitlab } from '@gitbeaker/node'
+import {Gitlab} from '@gitbeaker/node'
 
 import * as fs from 'fs';
 
@@ -168,7 +168,12 @@ async function transferMilestones() {
   // Get a list of all milestones associated with this project
   let milestones = await gitlabApi.ProjectMilestones.all(
     settings.gitlab.projectId
-  );
+  ) as any[];
+
+  if(settings.transfer.transferOnlyOpen) {
+      // filter active milestones
+    milestones = milestones.filter(milestone => milestone.state === "active")
+  }
 
   // sort milestones in ascending order of when they were created (by id)
   milestones = milestones.sort((a, b) => a.id - b.id);
@@ -261,6 +266,11 @@ async function transferIssues() {
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
   }) as any[];
+
+  // filter issues to only get those in state 'opened'
+   if (settings.transfer.transferOnlyOpen) {
+        issues = issues.filter(issue => issue.state === 'opened');
+    }
 
   // sort issues in ascending order of their issue number (by iid)
   issues = issues.sort((a, b) => a.iid - b.iid);
@@ -377,7 +387,12 @@ async function transferMergeRequests() {
   let mergeRequests = await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any;
+  }) as any[];
+
+    // filter issues to only get those in state 'opened'
+   if (settings.transfer.transferOnlyOpen) {
+        mergeRequests = mergeRequests.filter(mergeRequest => mergeRequest.state === 'opened');
+    }
 
   // Sort merge requests in ascending order of their number (by iid)
   mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);

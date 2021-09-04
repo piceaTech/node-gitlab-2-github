@@ -33,6 +33,7 @@ export default {
     labels: true,
     issues: true,
     mergeRequests: true,
+    transferOnlyOpen: false
   },
   debug: false,
   usePlaceholderIssuesForMissingIssues: true,
