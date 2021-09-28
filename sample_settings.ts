@@ -13,6 +13,12 @@ export default {
     repo: '{{repo}}',
   },
   s3: {
+    useS3: false,
+    keepLocal: true,
+    // overrideURL: 'github.example.com/org/repo/raw/master',
+    overrideURL: '{{overrideURL}}',
+    // overrideSuffix if needed
+    overrideSuffix: '{{overrideSuffix}}',
     accessKeyId: '{{accessKeyId}}',
     secretAccessKey: '{{secretAccessKey}}',
     bucket: 'my-gitlab-bucket',
@@ -35,6 +41,7 @@ export default {
     mergeRequests: true,
   },
   debug: false,
+  clearIssueAssignment: false,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,

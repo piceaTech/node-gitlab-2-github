@@ -222,18 +222,22 @@ export default class GithubHelper {
     // Issue Assignee
     //
 
-    // If the GitLab issue has an assignee, make sure to carry it over -- but only
-    // if the username is a valid GitHub username.
-    if (issue.assignee) {
-      props.assignees = [];
-      if (issue.assignee.username === settings.github.username) {
-        props.assignees.push(settings.github.username);
-      } else if (
-        settings.usermap &&
-        settings.usermap[issue.assignee.username]
-      ) {
-        // get GitHub username name from settings
-        props.assignees.push(settings.usermap[issue.assignee.username]);
+    if(settings.clearIssueAssignment) {
+      // do not assign new issues
+    } else {
+      // If the GitLab issue has an assignee, make sure to carry it over -- but only
+      // if the username is a valid GitHub username.
+      if (issue.assignee) {
+        props.assignees = [];
+        if (issue.assignee.username === settings.github.username) {
+          props.assignees.push(settings.github.username);
+        } else if (
+          settings.usermap &&
+          settings.usermap[issue.assignee.username]
+        ) {
+          // get GitHub username name from settings
+          props.assignees.push(settings.usermap[issue.assignee.username]);
+        }
       }
     }
 
@@ -677,20 +681,27 @@ export default class GithubHelper {
     // Pull Request Assignee
     //
 
-    // If the GitLab merge request has an assignee, make sure to carry it over --
-    // but only if the username is a valid GitHub username
-    if (pullRequest.assignee) {
-      props.assignees = [];
-      if (pullRequest.assignee.username === settings.github.username) {
-        props.assignees.push(settings.github.username);
-      } else if (
-        settings.usermap &&
-        settings.usermap[pullRequest.assignee.username]
-      ) {
-        // Get GitHub username from settings
-        props.assignees.push(settings.usermap[pullRequest.assignee.username]);
+    if (pullRequest.assignee){
+      if(settings.clearIssueAssignment) {
+        // do not assign new issues
+        props.assignees = [];
+      } else {
+      // If the GitLab merge request has an assignee, make sure to carry it over --
+      // but only if the username is a valid GitHub username
+        props.assignees = [];
+        if (pullRequest.assignee.username === settings.github.username) {
+          props.assignees.push(settings.github.username);
+        } else if (
+          settings.usermap &&
+          settings.usermap[pullRequest.assignee.username]
+        ) {
+          // Get GitHub username from settings
+          props.assignees.push(settings.usermap[pullRequest.assignee.username]);
+        }
       }
     }
+
+
 
     //
     // Pull Request Milestone

@@ -92,7 +92,7 @@ export default class GitlabHelper {
     try {
       const host = this.host.endsWith('/') ? this.host : this.host + '/';
       const attachmentUrl = host + this.projectPath + relurl;
-      const data = (await axios.get(attachmentUrl, {responseType: 'arraybuffer'})).data;
+      const data = (await axios.get(encodeURI(attachmentUrl), {responseType: 'arraybuffer'})).data;
       return Buffer.from(data, 'binary')
     } catch (err) {
       console.error(`Could not download attachment #${relurl}.`);
