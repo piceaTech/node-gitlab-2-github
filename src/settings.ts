@@ -12,6 +12,7 @@ export default interface Settings {
     useLowerCaseLabels: boolean;
   };
   transfer: {
+    description: boolean;
     milestones: boolean;
     labels: boolean;
     issues: boolean;

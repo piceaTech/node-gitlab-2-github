@@ -206,6 +206,20 @@ export default class GithubHelper {
    */
 
   /**
+   * Update the description of the repository on GitHub.
+   * Replaces newlines and tabs with spaces. No attempt is made to remove e.g. Markdown
+   * links or other special formatting.
+   */
+  async updateRepositoryDescription(description) {
+    let props : RestEndpointMethodTypes["repos"]["update"]["parameters"] = {
+      owner: this.githubOwner,
+      repo: this.githubRepo,
+      description: description.replace(/\s+/g, " ")
+    }
+    return this.githubApi.repos.update(props);
+  }
+
+  /**
    * TODO description
    */
   async createIssue(milestones, issue) {
