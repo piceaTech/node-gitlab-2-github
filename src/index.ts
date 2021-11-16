@@ -3,12 +3,13 @@ import GitlabHelper from './gitlabHelper';
 import settings from '../settings';
 
 import {Octokit as GitHubApi} from '@octokit/rest';
+import {throttling} from '@octokit/plugin-throttling';
 import { Gitlab } from '@gitbeaker/node'
 
 import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
-
+import { sleep } from './utils';
 
 const issueCounters = {
   nrOfPlaceholderIssues: 0,
@@ -51,8 +52,10 @@ const gitlabApi = new Gitlab({
   token: settings.gitlab.token,
 });
 
+const MyOctokit = GitHubApi.plugin(throttling);
+
 // Create a GitHub API object
-const githubApi = new GitHubApi({
+const githubApi = new MyOctokit({
   debug: false,
   baseUrl: settings.github.baseUrl
     ? settings.github.baseUrl
@@ -63,6 +66,22 @@ const githubApi = new GitHubApi({
     accept: 'application/vnd.github.v3+json',
   },
   auth: 'token ' + settings.github.token,
+  throttle: {
+    onRateLimit: async (retryAfter, options) => {
+      console.log(
+        `Request quota exhausted for request ${options.method} ${options.url}`
+      );
+      await sleep(60000);
+      return true;
+    },
+    onAbuseLimit: async (retryAfter, options) => {
+      console.log(
+        `Abuse detected for request ${options.method} ${options.url}`
+      );
+      await sleep(60000);
+      return true;
+    },
+  },
 });
 
 const gitlabHelper = new GitlabHelper(gitlabApi, settings.gitlab);
