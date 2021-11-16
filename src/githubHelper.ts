@@ -206,6 +206,18 @@ export default class GithubHelper {
    */
 
   /**
+   * Replace the topics of the repository on GitHub.
+   */
+  async replaceTopics(topics) {
+    let props : RestEndpointMethodTypes["repos"]["replaceAllTopics"]["parameters"] = {
+      owner: this.githubOwner,
+      repo: this.githubRepo,
+      names: topics
+    }
+    return this.githubApi.repos.replaceAllTopics(props);
+  }
+ 
+  /**
    * TODO description
    */
   async createIssue(milestones, issue) {

@@ -127,6 +127,11 @@ async function migrate() {
 
     await githubHelper.registerRepoId();
 
+    // set the gitlab-mr-migrating topic for the repository during the migration
+    if (settings.transfer.migrationTopic) {
+      await setMigratingTopic();
+    }
+
     // transfer GitLab milestones to GitHub
     if (settings.transfer.milestones) {
       await transferMilestones();
@@ -154,7 +159,32 @@ async function migrate() {
     console.error(err);
   }
 
+  // set the gitlab-mr-migrated topic for the repository when migration is done
+  if (settings.transfer.migrationTopic) {
+    await setMigratedTopic();
+  }
+
   console.log('\n\nTransfer complete!\n\n');
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Set the gitlab-mr-migrating topic.
+ */
+async function setMigratingTopic() {
+  inform('Setting the gitlab-mr-migrating topic during the transfer');
+  await githubHelper.replaceTopics(['gitlab-mr-migrating']);
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Set the gitlab-mr-migrated topic.
+ */
+async function setMigratedTopic() {
+  inform('Setting the gitlab-mr-migrated topic during the transfer');
+  await githubHelper.replaceTopics(['gitlab-mr-migrated']);
 }
 
 // ----------------------------------------------------------------------------
