@@ -183,7 +183,7 @@ async function setMigratingTopic() {
  * Set the gitlab-mr-migrated topic.
  */
 async function setMigratedTopic() {
-  inform('Setting the gitlab-mr-migrated topic during the transfer');
+  inform('Setting the gitlab-mr-migrated topic since the transfer is done');
   await githubHelper.replaceTopics(['gitlab-mr-migrated']);
 }
 
@@ -431,6 +431,7 @@ async function transferMergeRequests() {
   // if a GitLab merge request does not exist in GitHub repo, create it -- along
   // with comments
   for (let request of mergeRequests) {
+    // if (request.iid < 333) continue;
     // Try to find a GitHub pull request that already exists for this GitLab
     // merge request
     let githubRequest = githubPullRequests.find(
