@@ -7,6 +7,22 @@ import GitlabHelper from './gitlabHelper';
 
 const gitHubLocation = 'https://github.com';
 
+interface CommentImport {
+  created_at?: string;
+  body: string
+};
+
+interface IssueImport {
+  title: string;
+  body: string;
+  created_at: string;
+  closed: boolean;
+  assignee?: string;
+  updated_at?: string;
+  milestone?: number;
+  labels?: Array<string>;
+}
+
 export default class GithubHelper {
   githubApi: GitHubApi;
   githubUrl: string;
@@ -290,23 +306,7 @@ export default class GithubHelper {
    * @param milestones All GitHub milestones
    * @param issue The GitLab issue object
    */
-  async importIssue(milestones, issue) {
-
-    interface CommentImport {
-      created_at?: string;
-      body: string
-    };
-
-    interface IssueImport {
-      title: string;
-      body: string;
-      created_at: string;
-      closed: boolean;
-      assignee?: string;
-      updated_at?: string;
-      milestone?: number;
-      labels?: Array<string>;
-    }
+  async importIssueAndComments(milestones, issue) {
 
     let userIsCreator = issue.author && 
       ((settings.usermap && settings.usermap[issue.author.username] === settings.github.token_owner) ||
@@ -321,7 +321,7 @@ export default class GithubHelper {
       closed: issue.state === 'closed'
     };
 
-    let comments : Array<CommentImport> = [];
+    let comments : Array<CommentImport>;
 
     //
     // Issue Assignee
@@ -332,12 +332,10 @@ export default class GithubHelper {
     if (issue.assignee) {
       if (issue.assignee.username === settings.github.username) {
         props.assignee = settings.github.username;
-      } else if (
-        settings.usermap &&
-        settings.usermap[issue.assignee.username]
-      ) {
-        // get GitHub username name from settings
+      } else if (settings.usermap && settings.usermap[issue.assignee.username] ) {
         props.assignee = settings.usermap[issue.assignee.username];
+      } else if (issue.assignee.username === settings.github.token_owner) {
+        props.assignee = settings.github.token_owner;
       }
     }
 
@@ -394,38 +392,64 @@ export default class GithubHelper {
       );
     } else {
       let notes = await this.gitlabHelper.getIssueNotes(issue.iid);
-
-      // sort notes in ascending order of when they were created (by id)
-      notes = notes.sort((a, b) => a.id - b.id);
-
-      let nrOfMigratedNotes = 0;
-      for (let note of notes) {
-        if (this.checkIfNoteCanBeSkipped(note.body)) {
-          continue;
-        }
-
-        let userIsPoster = (settings.usermap && 
-            settings.usermap[note.author.username] === settings.github.token_owner) ||
-            note.author.username === settings.github.token_owner;
-
-        comments.push({
-          created_at: note.created_at,
-          body: await this.convertIssuesAndComments(
-            note.body, note, !userIsPoster || !note.body)
-        });
-
-        nrOfMigratedNotes += 1;
-      }
-      console.log(
-        `\t...Done creating issue comments (migrated ${nrOfMigratedNotes} comments, skipped ${notes.length - nrOfMigratedNotes} comments)`
-      );
+      comments = await this.processNotesIntoComments(notes);
     }
 
+    return this.requestImportIssue(props, comments);
+  }
+
+  /**
+   * 
+   * @param notes 
+   * @returns Comments ready for requestImportIssue()
+   */
+  async processNotesIntoComments(notes) {
+    let comments : Array<CommentImport> = [];
+
+    // sort notes in ascending order of when they were created (by id)
+    notes = notes.sort((a, b) => a.id - b.id);
+
+    if (notes.length === 0) {
+      console.log(`\t...no comments available, nothing to migrate.`);
+      return [];
+    }
+
+    let nrOfMigratedNotes = 0;
+    for (let note of notes) {
+      if (this.checkIfNoteCanBeSkipped(note.body)) {
+        continue;
+      }
+
+      let userIsPoster = (settings.usermap && 
+          settings.usermap[note.author.username] === settings.github.token_owner) ||
+          note.author.username === settings.github.token_owner;
+
+      comments.push({
+        created_at: note.created_at,
+        body: await this.convertIssuesAndComments(
+          note.body, note, !userIsPoster || !note.body)
+      });
+
+      nrOfMigratedNotes++;
+    }
+    console.log(
+      `\t...Done creating comments (migrated ${nrOfMigratedNotes} comments, skipped ${notes.length - nrOfMigratedNotes} comments)`
+    );
+    return comments;
+  }
+  /**
+   * Calls the preview API for issue importing
+   * 
+   * @param issue Props for the issue
+   * @param comments Comments
+   * @returns GitHub issue number or null if import failed
+   */
+  async requestImportIssue(issue : IssueImport, comments : Array<CommentImport>) {
     // create the GitHub issue from the GitLab issue
     let pending = await this.githubApi.request(
         `POST /repos/${settings.github.owner}/${settings.github.repo}/import/issues`, 
         {
-          "issue": props,
+          "issue": issue,
           "comments": comments
         });
 
@@ -636,6 +660,13 @@ export default class GithubHelper {
    */
   async createPullRequestAndComments(milestones, pullRequest) {
     let githubPullRequestData = await this.createPullRequest(pullRequest);
+    
+    // createPullRequest() returns an issue number if a PR could not be created and
+    // an issue was created instead, and settings.useIssueImportAPI is true. In that
+    // case comments were already added and the state is already properly set
+    if (typeof githubPullRequestData === 'number')
+      return;
+
     let githubPullRequest = githubPullRequestData.data;
 
     // data is set to null if one of the branches does not exist and the pull request cannot be created
@@ -754,6 +785,11 @@ export default class GithubHelper {
     }
 
     // Failing all else, create an issue with a descriptive title
+
+    let userIsCreator = pullRequest.author && 
+      ((settings.usermap && settings.usermap[pullRequest.author.username] === settings.github.token_owner) ||
+       (pullRequest.author.username === settings.github.token_owner));
+
     let mergeStr =
       '_Merges ' +
       pullRequest.source_branch +
@@ -762,19 +798,57 @@ export default class GithubHelper {
       '_\n\n';
     let bodyConverted = await this.convertIssuesAndComments(
       mergeStr + pullRequest.description,
-      pullRequest
+      pullRequest,
+      !userIsCreator || !settings.useIssueImportAPI
     );
-    let props = {
-      owner: this.githubOwner,
-      repo: this.githubRepo,
-      title: pullRequest.title.trim() + ' - [' + pullRequest.state + ']',
-      body: bodyConverted,
-    };
 
-    // Add a label to indicate the issue is a merge request
-    pullRequest.labels.push('gitlab merge request');
+    if (settings.useIssueImportAPI) {          
+      let props : IssueImport = {
+        title: pullRequest.title.trim() + ' - [' + pullRequest.state + ']',
+        body: bodyConverted,
+        created_at: pullRequest.created_at,
+        updated_at: pullRequest.updated_at,
+        closed: pullRequest.state === 'merged' || pullRequest.state === 'closed',
+        labels: ['gitlab merge request']
+      };
 
-    return this.githubApi.issues.create(props);
+      if (pullRequest.assignee) {
+        if (pullRequest.assignee.username === settings.github.username) {
+          props.assignee = settings.github.username;
+        } else if (settings.usermap && settings.usermap[pullRequest.assignee.username] ) {
+          props.assignee = settings.usermap[pullRequest.assignee.username];
+        } else if (pullRequest.assignee.username === settings.github.token_owner) {
+          props.assignee = settings.github.token_owner;
+        }
+      }
+
+      console.log('\tMigrating pull request comments...');
+      let comments : Array<CommentImport> = [];
+
+      if (!pullRequest.iid) {
+        console.log(
+          '\t...this is a placeholder for a deleted GitLab merge request, no comments are created.'
+        );
+      } else {
+        let notes = await this.gitlabHelper.getAllMergeRequestNotes(pullRequest.iid);
+        comments = await this.processNotesIntoComments(notes);  
+      }
+
+      return this.requestImportIssue(props, comments);
+
+    } else {
+      let props = {
+        owner: this.githubOwner,
+        repo: this.githubRepo,
+        title: pullRequest.title.trim() + ' - [' + pullRequest.state + ']',
+        body: bodyConverted,
+      };
+
+      // Add a label to indicate the issue is a merge request
+      pullRequest.labels.push('gitlab merge request');
+
+      return this.githubApi.issues.create(props);
+    }
   }
 
   // ----------------------------------------------------------------------------
@@ -941,8 +1015,7 @@ export default class GithubHelper {
    */
   async createIssueAndComments(milestones, issue) {
     if (settings.useIssueImportAPI) {
-      // Includes comment creation
-      const githubIssueData = await this.importIssue(milestones, issue);
+      await this.importIssueAndComments(milestones, issue);
     } else {
       const githubIssueData = await this.createIssue(milestones, issue);
       const githubIssue = githubIssueData.data;
