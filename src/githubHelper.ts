@@ -1097,7 +1097,7 @@ export default class GithubHelper {
       return str;
     }
 
-    const dateformatOptions = {
+    const dateformatOptions : Intl.DateTimeFormatOptions = {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
