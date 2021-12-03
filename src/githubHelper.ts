@@ -207,6 +207,8 @@ export default class GithubHelper {
 
   /**
    * TODO description
+   * @param milestones All GitHub milestones
+   * @param issue The GitLab issue object
    */
   async createIssue(milestones, issue) {
     let bodyConverted = await this.convertIssuesAndComments(issue.description, issue);
@@ -278,6 +280,172 @@ export default class GithubHelper {
     if (settings.debug) return Promise.resolve({ data: issue });
     // create the GitHub issue from the GitLab issue
     return this.githubApi.issues.create(props);
+  }
+
+  /** 
+   * Uses the preview issue import API to set creation date on issues and comments.
+   * Also it does not notify assignees.
+   * 
+   * See https://gist.github.com/jonmagic/5282384165e0f86ef105
+   * @param milestones All GitHub milestones
+   * @param issue The GitLab issue object
+   */
+  async importIssue(milestones, issue) {
+
+    interface CommentImport {
+      created_at?: string;
+      body: string
+    };
+
+    interface IssueImport {
+      title: string;
+      body: string;
+      created_at: string;
+      closed: boolean;
+      assignee?: string;
+      updated_at?: string;
+      milestone?: number;
+      labels?: Array<string>;
+    }
+
+    let userIsCreator = issue.author && 
+      ((settings.usermap && settings.usermap[issue.author.username] === settings.github.token_owner) ||
+       (issue.author.username === settings.github.token_owner));
+
+    let props : IssueImport = {
+      title: issue.title.trim(),
+      body: await this.convertIssuesAndComments(
+        issue.description, issue, !userIsCreator || !issue.description),
+      created_at: issue.created_at,
+      updated_at: issue.updated_at,
+      closed: issue.state === 'closed'
+    };
+
+    let comments : Array<CommentImport> = [];
+
+    //
+    // Issue Assignee
+    //
+
+    // If the GitLab issue has an assignee, make sure to carry it over -- but only
+    // if the username is a valid GitHub username.
+    if (issue.assignee) {
+      if (issue.assignee.username === settings.github.username) {
+        props.assignee = settings.github.username;
+      } else if (
+        settings.usermap &&
+        settings.usermap[issue.assignee.username]
+      ) {
+        // get GitHub username name from settings
+        props.assignee = settings.usermap[issue.assignee.username];
+      }
+    }
+
+    //
+    // Issue Milestone
+    //
+
+    // if the GitLab issue has an associated milestone, make sure to attach it.
+    if (issue.milestone) {
+      let milestone = milestones.find(m => m.title === issue.milestone.title);
+      if (milestone) {
+        props.milestone = milestone.number;
+      }
+    }
+
+    //
+    // Issue Labels
+    //
+
+    // make sure to add any labels that existed in GitLab
+    if (issue.labels) {
+      props.labels = issue.labels.filter(l => {
+        if (issue.state !== 'closed') return true;
+
+        let lower = l.toLowerCase();
+        // ignore any labels that should have been removed when the issue was closed
+        return lower !== 'doing' && lower !== 'to do';
+      }).map((el : string) => el.toLowerCase());
+    }
+
+    //
+    // Issue Attachments
+    //
+
+    // if the issue contains a url that contains "/uploads/", it is likely to
+    // have an attachment. Therefore, add the "has attachment" label.
+    if (props.body && props.body.indexOf('/uploads/') > -1 && !settings.s3) {
+      props.labels.push('has attachment');
+    }
+    await utils.sleep(this.delayInMs);
+
+    if (settings.debug) return Promise.resolve({ data: issue });
+
+
+    //
+    // Issue comments
+    //
+
+    console.log('\tMigrating issue comments...');
+
+    if (issue.isPlaceholder) {
+      console.log(
+        '\t...this is a placeholder issue, no comments are migrated.'
+      );
+    } else {
+      let notes = await this.gitlabHelper.getIssueNotes(issue.iid);
+
+      // sort notes in ascending order of when they were created (by id)
+      notes = notes.sort((a, b) => a.id - b.id);
+
+      let nrOfMigratedNotes = 0;
+      for (let note of notes) {
+        if (this.checkIfNoteCanBeSkipped(note.body)) {
+          continue;
+        }
+
+        let userIsPoster = (settings.usermap && 
+            settings.usermap[note.author.username] === settings.github.token_owner) ||
+            note.author.username === settings.github.token_owner;
+
+        comments.push({
+          created_at: note.created_at,
+          body: await this.convertIssuesAndComments(
+            note.body, note, !userIsPoster || !note.body)
+        });
+
+        nrOfMigratedNotes += 1;
+      }
+      console.log(
+        `\t...Done creating issue comments (migrated ${nrOfMigratedNotes} comments, skipped ${notes.length - nrOfMigratedNotes} comments)`
+      );
+    }
+
+    // create the GitHub issue from the GitLab issue
+    let pending = await this.githubApi.request(
+        `POST /repos/${settings.github.owner}/${settings.github.repo}/import/issues`, 
+        {
+          "issue": props,
+          "comments": comments
+        });
+
+    let result = null;
+    while (true) {
+      await utils.sleep(this.delayInMs);
+      result = await this.githubApi.request(
+        `GET /repos/${settings.github.owner}/${settings.github.repo}/import/issues/${pending.data.id}`);
+      if (result.data.status === "imported" || result.data.status === "failed") {
+        break;
+      }
+    }
+    if (result.data.status === "failed") {
+      console.log("\tFAILED: ");
+      console.log(result);
+      return null;
+    }
+
+    let issue_number = result.data.issue_url.split('/').splice(-1)[0];
+    return issue_number;
   }
 
   // ----------------------------------------------------------------------------
@@ -767,18 +935,22 @@ export default class GithubHelper {
   // ----------------------------------------------------------------------------
 
   /**
-   * TODO description
+   * Creates issues extracting commments from gitlab notes
+   * @param milestones GitHub milestones
+   * @param issue GitLab issue
    */
   async createIssueAndComments(milestones, issue) {
-    // create the issue in GitHub
-    const githubIssueData = await this.createIssue(milestones, issue);
-    const githubIssue = githubIssueData.data;
-
-    // add any comments/notes associated with this issue
-    await this.createIssueComments(githubIssue, issue);
-
-    // make sure to close the GitHub issue if it is closed in GitLab
-    await this.updateIssueState(githubIssue, issue);
+    if (settings.useIssueImportAPI) {
+      // Includes comment creation
+      const githubIssueData = await this.importIssue(milestones, issue);
+    } else {
+      const githubIssueData = await this.createIssue(milestones, issue);
+      const githubIssue = githubIssueData.data;
+      // add any comments/notes associated with this issue
+      await this.createIssueComments(githubIssue, issue);
+      // make sure to close the GitHub issue if it is closed in GitLab
+      await this.updateIssueState(githubIssue, issue);
+    }
   }
 
   // ----------------------------------------------------------------------------
@@ -786,25 +958,33 @@ export default class GithubHelper {
   // TODO fix unexpected type coercion risk
   /**
    * Converts issue body and issue comments from GitLab to GitHub. That means:
-   * - Add a line at the beginning indicating which original user created the
-   *   issue or the comment and when - because the GitHub API creates everything
-   *   as the API user
+   * - (optionally) add a line at the beginning indicating which original user 
+   *   created the issue or the comment and when - because the GitHub API creates
+   *   everything as the API user (use useIssueImportAPI: true in settings to use
+   *   the issue import preview API instead which allows setting the date)
    * - Change username from GitLab to GitHub in "mentions" (@username)
+   * @param str Body of the GitLab note
+   * @param item GitLab note
+   * @param add_line Set to true to add the line with author and creation date
    */
 
-  async convertIssuesAndComments(str: string, item: any) {
+  async convertIssuesAndComments(str: string, item: any, add_line: boolean = true) {
     const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
     if (
       (!settings.usermap || Object.keys(settings.usermap).length === 0) &&
       (!settings.projectmap || Object.keys(settings.projectmap).length === 0)
     ) {
-      return GithubHelper.addMigrationLine(str, item, repoLink);
+      return add_line
+          ? GithubHelper.addMigrationLine(str, item, repoLink) 
+          : str;
     } else {
       // - Replace userids as defined in settings.usermap.
       //   They all start with '@' in the issues but we have them without in usermap
       // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
       //   They all have a '#' right after the project name in the issues but we have them without in projectmap
-      let strWithMigLine = GithubHelper.addMigrationLine(str, item, repoLink);
+      let strWithMigLine = add_line
+          ? GithubHelper.addMigrationLine(str, item, repoLink) 
+          : str;
 
       strWithMigLine = strWithMigLine.replace(
         this.userProjectRegex,

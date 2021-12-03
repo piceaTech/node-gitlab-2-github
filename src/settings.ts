@@ -34,6 +34,7 @@ export interface GithubSettings {
   baseUrl?: string;
   owner: string;
   token: string;
+  token_owner: string;
   repo: string;
   timeout?: number;
   username?: string; // when is this set???

@@ -70,6 +70,10 @@ Under which organisation or user will the new project be hosted
 
 Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token with `repo` scope and copy that into the `settings.ts`
 
+#### github.token_owner
+
+Set to the user name of the user whose token is used (see above). This is required to determine whether the user running the migration is also the creator of comments and issues. If this is the case and `useIssueCreationAPI` is true (see below), the extra line specifying who created a comment or issue will not be added.
+
 #### github.repo
 
 What is the name of the new repo
