@@ -14,6 +14,7 @@ export default class GitlabHelper {
 
   host: string;
   projectPath?: string;
+  allBranches: any;
 
   constructor(
     gitlabApi: InstanceType<typeof Gitlab>,
@@ -24,6 +25,7 @@ export default class GitlabHelper {
     this.gitlabToken = gitlabSettings.token;
     this.gitlabProjectId = gitlabSettings.projectId;
     this.host = gitlabSettings.url ? gitlabSettings.url : 'http://gitlab.com';
+    this.allBranches = null;
   }
 
   /**
@@ -104,7 +106,10 @@ export default class GitlabHelper {
    * Gets all branches.
    */
   async getAllBranches() {
-    return (await this.gitlabApi.Branches.all(this.gitlabProjectId)) as any[];
+    if (!this.allBranches){
+      this.allBranches = await this.gitlabApi.Branches.all(this.gitlabProjectId);
+    }
+    return this.allBranches as any[];
   }
 
   /**
