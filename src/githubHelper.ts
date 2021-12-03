@@ -279,7 +279,7 @@ export default class GithubHelper {
         let lower = l.toLowerCase();
         // ignore any labels that should have been removed when the issue was closed
         return lower !== 'doing' && lower !== 'to do';
-      });
+      }).map((el : string) => el.toLowerCase());
     }
 
     //
