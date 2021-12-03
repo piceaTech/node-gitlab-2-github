@@ -108,6 +108,10 @@ If this is set to true (default) then the migration process will transfer merge 
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls
 
+#### useIssueImportAPI
+
+Set to true (default) to enable using the [GitHub preview API for importing issues](https://gist.github.com/jonmagic/5282384165e0f86ef105). This allows setting the date for issues and comments instead of inserting an additional line in the body.
+
 #### usePlaceholderIssuesForMissingIssues
 
 If this is set to true (default) then the migration process will automatically create empty dummy issues for every 'missing' GitLab issue (if you deleted an GitLab issue for example). Those issues will be closed on Github and they ensure, that the issue ids stay the same on both, GitLab and Github.

@@ -35,6 +35,7 @@ export default {
     mergeRequests: true,
   },
   debug: false,
+  useIssueImportAPI: true,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,

@@ -53,6 +53,7 @@ const gitlabApi = new Gitlab({
 
 // Create a GitHub API object
 const githubApi = new GitHubApi({
+  previews: settings.useIssueImportAPI ? ["golden-comet"] : [],
   debug: false,
   baseUrl: settings.github.baseUrl
     ? settings.github.baseUrl
