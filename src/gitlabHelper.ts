@@ -11,6 +11,7 @@ export default class GitlabHelper {
   gitlabUrl?: string;
   gitlabToken: string;
   gitlabProjectId: number;
+  sessionCookie: string;
 
   host: string;
   projectPath?: string;
@@ -24,6 +25,7 @@ export default class GitlabHelper {
     this.gitlabToken = gitlabSettings.token;
     this.gitlabProjectId = gitlabSettings.projectId;
     this.host = gitlabSettings.url ? gitlabSettings.url : 'http://gitlab.com';
+    this.sessionCookie = gitlabSettings.sessionCookie;
   }
 
   /**
@@ -92,7 +94,13 @@ export default class GitlabHelper {
     try {
       const host = this.host.endsWith('/') ? this.host : this.host + '/';
       const attachmentUrl = host + this.projectPath + relurl;
-      const data = (await axios.get(attachmentUrl, {responseType: 'arraybuffer'})).data;
+      const data = (await axios.get(attachmentUrl, {
+          responseType: 'arraybuffer',
+          headers: {
+            // HACK: work around GitLab's API lack of GET for attachments
+            // See https://gitlab.com/gitlab-org/gitlab/-/issues/24155
+            Cookie: `_gitlab_session=${this.sessionCookie}`
+          }})).data;
       return Buffer.from(data, 'binary')
     } catch (err) {
       console.error(`Could not download attachment #${relurl}.`);
