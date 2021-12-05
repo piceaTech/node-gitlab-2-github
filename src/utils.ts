@@ -81,7 +81,7 @@ export const migrateAttachments = async (body: string, githubRepoId: number | un
           if (err) {
             console.log('ERROR: ', err);
           } else {
-            console.log(`\t... success`);
+            console.log(`\t...Done uploading`);
           }
         });
       });
@@ -97,5 +97,5 @@ export const migrateAttachments = async (body: string, githubRepoId: number | un
     }
   }
 
-  return body.replace(regexp, ({},{},{},offset,{}) => offsetToAttachment[offset]);
+  return body.replace(regexp, ({},{},{},{},offset,{}) => offsetToAttachment[offset]);
 };
