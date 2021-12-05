@@ -21,6 +21,7 @@ export default interface Settings {
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;
   filterByLabel: string | null;
+  skipMergeRequestStates: string[];
   skipMatchingComments: string[];
   mergeRequests: {
     logFile: string;
