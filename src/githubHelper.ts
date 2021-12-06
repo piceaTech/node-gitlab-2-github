@@ -220,6 +220,11 @@ export default class GithubHelper {
    ******************************** POST METHODS ********************************
    ******************************************************************************
    */
+   userIsCreator(author) {
+    return author && 
+      ((settings.usermap && settings.usermap[author.username] === settings.github.token_owner) ||
+       (author.username === settings.github.token_owner));
+  }
 
   /**
    * TODO description
@@ -308,14 +313,10 @@ export default class GithubHelper {
    */
   async importIssueAndComments(milestones, issue) {
 
-    let userIsCreator = issue.author && 
-      ((settings.usermap && settings.usermap[issue.author.username] === settings.github.token_owner) ||
-       (issue.author.username === settings.github.token_owner));
-
     let props : IssueImport = {
       title: issue.title.trim(),
       body: await this.convertIssuesAndComments(
-        issue.description, issue, !userIsCreator || !issue.description),
+        issue.description, issue, !this.userIsCreator(issue.author) || !issue.description),
       created_at: issue.created_at,
       updated_at: issue.updated_at,
       closed: issue.state === 'closed'
@@ -786,10 +787,7 @@ export default class GithubHelper {
 
     // Failing all else, create an issue with a descriptive title
 
-    let userIsCreator = pullRequest.author && 
-      ((settings.usermap && settings.usermap[pullRequest.author.username] === settings.github.token_owner) ||
-       (pullRequest.author.username === settings.github.token_owner));
-
+    
     let mergeStr =
       '_Merges ' +
       pullRequest.source_branch +
@@ -799,7 +797,7 @@ export default class GithubHelper {
     let bodyConverted = await this.convertIssuesAndComments(
       mergeStr + pullRequest.description,
       pullRequest,
-      !userIsCreator || !settings.useIssueImportAPI
+      !this.userIsCreator(pullRequest.author) || !settings.useIssueImportAPI
     );
 
     if (settings.useIssueImportAPI) {          
