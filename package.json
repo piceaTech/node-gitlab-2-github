@@ -27,6 +27,7 @@
   "dependencies": {
     "@gitbeaker/node": "^23.1.0",
     "@octokit/rest": "^18.0.0",
+    "@octokit/plugin-throttling": "^3.4.3",
     "aws-sdk": "^2.712.0",
     "axios": "^0.21.1",
     "mime-types": "^2.1.27",
