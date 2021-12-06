@@ -375,8 +375,8 @@ export default class GithubHelper {
     if (props.body && props.body.indexOf('/uploads/') > -1 && !settings.s3) {
       props.labels.push('has attachment');
     }
-    await utils.sleep(this.delayInMs);
-
+    
+    // Is this OK? It will just return the argument
     if (settings.debug) return Promise.resolve({ data: issue });
 
 
