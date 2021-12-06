@@ -284,7 +284,10 @@ export default class GithubHelper {
         let lower = l.toLowerCase();
         // ignore any labels that should have been removed when the issue was closed
         return lower !== 'doing' && lower !== 'to do';
-      }).map((el : string) => el.toLowerCase());
+      });
+      if (settings.conversion.useLowerCaseLabels) {
+        props.labels = props.labels.map((el : string) => el.toLowerCase());
+      }
     }
 
     //
@@ -364,7 +367,10 @@ export default class GithubHelper {
         let lower = l.toLowerCase();
         // ignore any labels that should have been removed when the issue was closed
         return lower !== 'doing' && lower !== 'to do';
-      }).map((el : string) => el.toLowerCase());
+      });
+      if (settings.conversion.useLowerCaseLabels) {
+        props.labels = props.labels.map((el : string) => el.toLowerCase());
+      }
     }
 
     //
@@ -376,7 +382,7 @@ export default class GithubHelper {
     if (props.body && props.body.indexOf('/uploads/') > -1 && !settings.s3) {
       props.labels.push('has attachment');
     }
-    
+
     // Is this OK? It will just return the argument
     if (settings.debug) return Promise.resolve({ data: issue });
 
@@ -466,6 +472,8 @@ export default class GithubHelper {
     if (result.data.status === "failed") {
       console.log("\tFAILED: ");
       console.log(result);
+      console.log("\tERRORS:")
+      console.log(result.data.errors);
       return null;
     }
 
