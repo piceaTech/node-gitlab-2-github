@@ -145,6 +145,7 @@ async function migrate() {
   try {
 
     await githubHelper.registerRepoId();
+    await gitlabHelper.registerProjectPath(settings.gitlab.projectId);
 
     // transfer GitLab milestones to GitHub
     if (settings.transfer.milestones) {
@@ -268,8 +269,6 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
  */
 async function transferIssues() {
   inform('Transferring Issues');
-
-  await gitlabHelper. registerProjectPath(settings.gitlab.projectId);
 
   // Because each
   let milestoneData = await githubHelper.getAllGithubMilestones();
