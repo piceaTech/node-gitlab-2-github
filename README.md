@@ -56,6 +56,10 @@ Go to [Settings / Access Tokens](https://gitlab.com/profile/personal_access_toke
 
 Leave it null for the first run of the script. Then the script will show you which projects there are. Can be either string or number.
 
+#### gitlab.sessionCookie
+
+GitLab's API [does not allow downloading of attachments](https://gitlab.com/gitlab-org/gitlab/-/issues/24155) and only images can be downloaded using HTTP. To work around this limitation and enable binary attachments to be migrated one can use the session cookie set in the browser after logging in to the gitlab instance. The cookie is named `_gitlab_session`.
+
 ### github
 
 #### github.baseUrl

@@ -825,9 +825,7 @@ export default class GithubHelper {
         }
       );
 
-      if (settings.s3) {
-        strWithMigLine = await utils.migrateAttachments(strWithMigLine, this.repoId, settings.s3, this.gitlabHelper);
-      }
+      strWithMigLine = await utils.migrateAttachments(strWithMigLine, this.repoId, settings.s3, this.gitlabHelper);
 
       return strWithMigLine;
     }
