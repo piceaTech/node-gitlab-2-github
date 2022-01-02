@@ -156,8 +156,6 @@ async function migrate() {
         await transferMergeRequests();
       }
     }
-
-
   } catch (err) {
     console.error('Error during transfer:');
     console.error(err);
@@ -484,8 +482,8 @@ async function transferMergeRequests() {
 
   // if a GitLab release does not exist in GitHub repo, create it
   for (let release of releases) {
-    // Try to find a GitHub pull request that already exists for this GitLab
-    // merge request
+    // Try to find an existing github release that already exists for this GitLab
+    // release
     let githubRelease = await githubHelper.getReleaseByTag(release.tag_name);
     
     if (!githubRelease) {
@@ -503,12 +501,10 @@ async function transferMergeRequests() {
         console.error(err);
       }
     } else {
-      if (githubRelease) {
         console.log(
           'Gitlab release already exists (as github release): ' +
           githubRelease.data.name + ' - ' + githubRelease.data.tag_name
         );
-      }
     }
   }
 }
