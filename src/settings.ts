@@ -44,6 +44,7 @@ export interface GitlabSettings {
   url?: string;
   token: string;
   projectId: number;
+  sessionCookie: string;
 }
 
 export interface S3Settings {

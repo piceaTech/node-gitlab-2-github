@@ -5,6 +5,7 @@ export default {
     // url: 'https://gitlab.mycompany.com',
     token: '{{gitlab private token}}',
     projectId: null,
+    sessionCookie: null,
   },
   github: {
     // baseUrl: 'https://gitlab.mycompany.com:123/etc',
