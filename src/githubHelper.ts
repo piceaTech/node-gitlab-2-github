@@ -334,13 +334,17 @@ export default class GithubHelper {
     const stateChange =
       (/Status changed to .*/i.test(noteBody) &&
         !/Status changed to closed by commit.*/i.test(noteBody)) ||
-      /changed milestone to .*/i.test(noteBody) ||
-      /Milestone changed to .*/i.test(noteBody) ||
-      /Reassigned to /i.test(noteBody) ||
-      /added .* labels/i.test(noteBody) ||
-      /Added ~.* label/i.test(noteBody) ||
-      /removed ~.* label/i.test(noteBody) ||
-      /mentioned in issue.*/i.test(noteBody);
+      /^changed milestone to .*/i.test(noteBody) ||
+      /^Milestone changed to .*/i.test(noteBody) ||
+      /^(Re)*assigned to /i.test(noteBody) ||
+      /^added .* labels/i.test(noteBody) ||
+      /^Added ~.* label/i.test(noteBody) ||
+      /^removed ~.* label/i.test(noteBody) ||
+      /^mentioned in issue #\d+.*/i.test(noteBody) ||
+      // /^marked this issue as related to #\d+/i.test(noteBody) ||
+      /^mentioned in merge request !\d+/i.test(noteBody) ||    
+      /^changed the description.*/i.test(noteBody) ||
+      /^changed title from.*to.*/i.test(noteBody);
 
     const matchingComment = settings.skipMatchingComments.reduce(
       (a, b) => a || new RegExp(b, 'i').test(noteBody),
