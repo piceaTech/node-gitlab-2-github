@@ -56,6 +56,10 @@ Go to [Settings / Access Tokens](https://gitlab.com/profile/personal_access_toke
 
 Leave it null for the first run of the script. Then the script will show you which projects there are. Can be either string or number.
 
+#### gitlab.sessionCookie
+
+GitLab's API [does not allow downloading of attachments](https://gitlab.com/gitlab-org/gitlab/-/issues/24155) and only images can be downloaded using HTTP. To work around this limitation and enable binary attachments to be migrated one can use the session cookie set in the browser after logging in to the gitlab instance. The cookie is named `_gitlab_session`.
+
 ### github
 
 #### github.baseUrl
@@ -69,6 +73,10 @@ Under which organisation or user will the new project be hosted
 #### github.token
 
 Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token with `repo` scope and copy that into the `settings.ts`
+
+#### github.token_owner
+
+Set to the user name of the user whose token is used (see above). This is required to determine whether the user running the migration is also the creator of comments and issues. If this is the case and `useIssueCreationAPI` is true (see below), the extra line specifying who created a comment or issue will not be added.
 
 #### github.repo
 
@@ -123,6 +131,10 @@ If this is set to true (default) then the migration process will transfer merge 
 ### debug
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls
+
+### useIssueImportAPI
+
+Set to true (default) to enable using the [GitHub preview API for importing issues](https://gist.github.com/jonmagic/5282384165e0f86ef105). This allows setting the date for issues and comments instead of inserting an additional line in the body.
 
 ### usePlaceholderIssuesForMissingIssues
 
