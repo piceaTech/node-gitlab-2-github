@@ -21,8 +21,10 @@ const issueCounters = {
 };
 
 if (settings.s3) {
-  AWS.config.accessKeyId = settings.s3.accessKeyId;
-  AWS.config.secretAccessKey = settings.s3.secretAccessKey;
+  AWS.config.credentials = new AWS.Credentials({
+    accessKeyId: settings.s3.accessKeyId,
+    secretAccessKey: settings.s3.secretAccessKey,
+  });
 }
 
 //let settings = null;
