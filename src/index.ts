@@ -2,14 +2,17 @@ import GithubHelper from './githubHelper';
 import GitlabHelper from './gitlabHelper';
 import settings from '../settings';
 
-import {Octokit as GitHubApi} from '@octokit/rest';
-import {throttling} from '@octokit/plugin-throttling';
-import { Gitlab } from '@gitbeaker/node'
+import { Octokit as GitHubApi } from '@octokit/rest';
+import { throttling } from '@octokit/plugin-throttling';
+import { Gitlab } from '@gitbeaker/node';
 
 import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
 import { sleep } from './utils';
+import { LabelSchema } from '@gitbeaker/core/dist/types/types';
+
+type Label = Pick<LabelSchema, 'name' | 'color' | 'description'>;
 
 const issueCounters = {
   nrOfPlaceholderIssues: 0,
@@ -85,10 +88,12 @@ const githubApi = new MyOctokit({
 });
 
 const gitlabHelper = new GitlabHelper(gitlabApi, settings.gitlab);
-const githubHelper = new GithubHelper(githubApi,
-                                      settings.github,
-                                      gitlabHelper,
-                                      settings.useIssuesForAllMergeRequests);
+const githubHelper = new GithubHelper(
+  githubApi,
+  settings.github,
+  gitlabHelper,
+  settings.useIssuesForAllMergeRequests
+);
 
 // If no project id is given in settings.js, just return
 // all of the projects that this user is associated with.
@@ -143,7 +148,6 @@ async function migrate() {
   //
 
   try {
-
     await githubHelper.registerRepoId();
     await gitlabHelper.registerProjectPath(settings.gitlab.projectId);
 
@@ -222,21 +226,26 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   inform('Transferring Labels');
 
   // Get a list of all labels associated with this project
-  let labels = await gitlabApi.Labels.all(settings.gitlab.projectId);
+  let labels: Label[] = await gitlabApi.Labels.all(settings.gitlab.projectId);
 
   // get a list of the current label names in the new GitHub repo (likely to be just the defaults)
-  let githubLabels = await githubHelper.getAllGithubLabelNames();
+  let githubLabels: string[] = await githubHelper.getAllGithubLabelNames();
 
   // create a hasAttachment label for manual attachment migration
   if (attachmentLabel) {
-    const hasAttachmentLabel = { name: 'has attachment', color: '#fbca04' };
+    const hasAttachmentLabel = {
+      name: 'has attachment',
+      color: '#fbca04',
+      description: 'Issue has attachments which might not have been migrated',
+    };
     labels.push(hasAttachmentLabel);
   }
 
-  // create gitlabMergeRequest label for non-migratable merge requests
   const gitlabMergeRequestLabel = {
     name: 'gitlab merge request',
     color: '#b36b00',
+    description:
+      'An issue replacing a merge request which cannot be migrated because of deleted branches',
   };
   labels.push(gitlabMergeRequestLabel);
 
@@ -275,10 +284,10 @@ async function transferIssues() {
 
   // get a list of all GitLab issues associated with this project
   // TODO return all issues via pagination
-  let issues = await gitlabApi.Issues.all({
+  let issues = (await gitlabApi.Issues.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any[];
+  })) as any[];
 
   // sort issues in ascending order of their issue number (by iid)
   issues = issues.sort((a, b) => a.iid - b.iid);
@@ -392,10 +401,10 @@ async function transferMergeRequests() {
 
   // Get a list of all pull requests (merge request equivalent) associated with
   // this project
-  let mergeRequests = await gitlabApi.MergeRequests.all({
+  let mergeRequests = (await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any;
+  })) as any;
 
   // Sort merge requests in ascending order of their number (by iid)
   mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
@@ -475,10 +484,10 @@ async function logMergeRequests(logFile) {
 
   // get a list of all GitLab merge requests associated with this project
   // TODO return all MRs via pagination
-  let mergeRequests = await gitlabApi.MergeRequests.all({
+  let mergeRequests = (await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any;
+  })) as any;
 
   // sort MRs in ascending order of when they were created (by id)
   mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);
