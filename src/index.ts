@@ -151,6 +151,11 @@ async function migrate() {
     await githubHelper.registerRepoId();
     await gitlabHelper.registerProjectPath(settings.gitlab.projectId);
 
+    // set the gitlab-mr-migrating topic for the repository during the migration
+    if (settings.transfer.migrationTopic) {
+      await setMigratingTopic();
+    }
+
     // transfer GitLab milestones to GitHub
     if (settings.transfer.milestones) {
       await transferMilestones();
@@ -178,7 +183,32 @@ async function migrate() {
     console.error(err);
   }
 
+  // set the gitlab-mr-migrated topic for the repository when migration is done
+  if (settings.transfer.migrationTopic) {
+    await setMigratedTopic();
+  }
+
   console.log('\n\nTransfer complete!\n\n');
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Set the gitlab-mr-migrating topic.
+ */
+async function setMigratingTopic() {
+  inform('Setting the gitlab-mr-migrating topic during the transfer');
+  await githubHelper.replaceTopics(['gitlab-mr-migrating']);
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Set the gitlab-mr-migrated topic.
+ */
+async function setMigratedTopic() {
+  inform('Setting the gitlab-mr-migrated topic since the transfer is done');
+  await githubHelper.replaceTopics(['gitlab-mr-migrated']);
 }
 
 // ----------------------------------------------------------------------------
@@ -427,6 +457,7 @@ async function transferMergeRequests() {
   // if a GitLab merge request does not exist in GitHub repo, create it -- along
   // with comments
   for (let request of mergeRequests) {
+    // if (request.iid < 333) continue;
     // Try to find a GitHub pull request that already exists for this GitLab
     // merge request
     let githubRequest = githubPullRequests.find(
