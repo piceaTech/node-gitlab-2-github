@@ -17,6 +17,7 @@ export default interface Settings {
     issues: boolean;
     mergeRequests: boolean;
   };
+  usePlaceholderMilestonesForMissingMilestones: boolean;
   usePlaceholderIssuesForMissingIssues: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;

@@ -36,6 +36,7 @@ export default {
     mergeRequests: true,
   },
   debug: false,
+  usePlaceholderMilestonesForMissingMilestones: true,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,

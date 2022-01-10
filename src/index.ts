@@ -1,20 +1,21 @@
-import GithubHelper from './githubHelper';
-import GitlabHelper from './gitlabHelper';
+import { GithubHelper } from './githubHelper';
+import { GitlabHelper, Milestone } from './gitlabHelper';
 import settings from '../settings';
 
-import {Octokit as GitHubApi} from '@octokit/rest';
-import {throttling} from '@octokit/plugin-throttling';
-import { Gitlab } from '@gitbeaker/node'
+import { Octokit as GitHubApi } from '@octokit/rest';
+import { throttling } from '@octokit/plugin-throttling';
+import { Gitlab } from '@gitbeaker/node';
 
 import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
 import { sleep } from './utils';
 
-const issueCounters = {
+const counters = {
   nrOfPlaceholderIssues: 0,
   nrOfReplacementIssues: 0,
   nrOfFailedIssues: 0,
+  nrOfPlaceholderMilestones: 0,
 };
 
 if (settings.s3) {
@@ -85,10 +86,12 @@ const githubApi = new MyOctokit({
 });
 
 const gitlabHelper = new GitlabHelper(gitlabApi, settings.gitlab);
-const githubHelper = new GithubHelper(githubApi,
-                                      settings.github,
-                                      gitlabHelper,
-                                      settings.useIssuesForAllMergeRequests);
+const githubHelper = new GithubHelper(
+  githubApi,
+  settings.github,
+  gitlabHelper,
+  settings.useIssuesForAllMergeRequests
+);
 
 // If no project id is given in settings.js, just return
 // all of the projects that this user is associated with.
@@ -101,15 +104,34 @@ if (!settings.gitlab.projectId) {
 
 // ----------------------------------------------------------------------------
 
-/*
- * TODO description
+/**
+ * Creates dummy data for a placeholder milestone
+ *
+ * @param expectedIdx Number of the GitLab milestone
+ * @returns Data for the milestone
+ */
+function createPlaceholderMilestone(expectedIdx: number): Milestone {
+  return {
+    iid: expectedIdx,
+    title: `[PLACEHOLDER] - for milestone #${expectedIdx}`,
+    description:
+      'This is to ensure that milestone numbers in GitLab and GitHub are the same',
+    state: 'closed',
+  };
+}
+
+/**
+ * Creates dummy data for a placeholder issue
+ *
+ * @param expectedIdx Number of the GitLab issue
+ * @returns Data for the issue
  */
 function createPlaceholderIssue(expectedIdx: number) {
   return {
     iid: expectedIdx,
-    title: `[PLACEHOLDER ISSUE] - for issue #${expectedIdx}`,
+    title: `[PLACEHOLDER] - for issue #${expectedIdx}`,
     description:
-      'This is to ensure the issue numbers in GitLab and GitHub are the same',
+      'This is to ensure that issue numbers in GitLab and GitHub are the same',
     state: 'closed',
     isPlaceholder: true,
   };
@@ -120,7 +142,7 @@ function createPlaceholderIssue(expectedIdx: number) {
 /*
  * TODO description
  */
-function createReplacementIssue(id, title, state) {
+function createReplacementIssue(id: number, title: string, state: string) {
   const originalGitlabIssueLink = 'TODO'; // TODO
   const description = `The original issue\n\n\tId: ${id}\n\tTitle: ${title}\n\ncould not be created.\nThis is a dummy issue, replacing the original one. It contains everything but the original issue description. In case the gitlab repository is still existing, visit the following link to show the original issue:\n\n${originalGitlabIssueLink}`;
 
@@ -143,13 +165,16 @@ async function migrate() {
   //
 
   try {
+    let milestoneMap: Map<number, number>;
 
     await githubHelper.registerRepoId();
     await gitlabHelper.registerProjectPath(settings.gitlab.projectId);
 
     // transfer GitLab milestones to GitHub
     if (settings.transfer.milestones) {
-      await transferMilestones();
+      milestoneMap = await transferMilestones(
+        settings.usePlaceholderMilestonesForMissingMilestones
+      );
     }
 
     // transfer GitLab labels to GitHub
@@ -182,11 +207,13 @@ async function migrate() {
 /**
  * Transfer any milestones that exist in GitLab that do not exist in GitHub.
  */
-async function transferMilestones() {
+async function transferMilestones(
+  usePlaceholders: boolean
+): Promise<Map<number, number>> {
   inform('Transferring Milestones');
 
   // Get a list of all milestones associated with this project
-  let milestones = await gitlabApi.ProjectMilestones.all(
+  let milestones: Milestone[] = await gitlabApi.ProjectMilestones.all(
     settings.gitlab.projectId
   );
 
@@ -196,21 +223,51 @@ async function transferMilestones() {
   // get a list of the current milestones in the new GitHub repo (likely to be empty)
   const githubMilestones = await githubHelper.getAllGithubMilestones();
 
+  if (usePlaceholders) {
+    for (let i = 0; i < milestones.length; i++) {
+      // GitLab internal Id (iid)
+      let expectedIdx = i + 1;
+
+      // Create placeholder milestones so that new GitHub milestones will have
+      // the same milestone number as in GitLab. Gaps are caused by deleted
+      // milestones
+      if (milestones[i].iid !== expectedIdx) {
+        milestones.splice(i, 0, createPlaceholderMilestone(expectedIdx));
+        counters.nrOfPlaceholderMilestones++;
+        console.log(
+          `Added placeholder milestone for GitLab milestone %${expectedIdx}.`
+        );
+      }
+    }
+  }
+
   // if a GitLab milestone does not exist in GitHub repo, create it.
+
+  let milestoneMap = new Map<number, number>();
+
   for (let milestone of milestones) {
-    if (!githubMilestones.find(m => m.title === milestone.title)) {
+    let foundMilestone = githubMilestones.find(
+      m => m.title === milestone.title
+    );
+    if (!foundMilestone) {
       console.log('Creating: ' + milestone.title);
       try {
         // process asynchronous code in sequence
-        await githubHelper.createMilestone(milestone);
+        let created = await githubHelper.createMilestone(milestone);
+        if (created instanceof Object) {
+          milestoneMap[milestone.iid] = created.number;
+        }
       } catch (err) {
         console.error('Could not create milestone', milestone.title);
         console.error(err);
       }
     } else {
       console.log('Already exists: ' + milestone.title);
+      milestoneMap[milestone.iid] = foundMilestone.number;
     }
   }
+
+  return milestoneMap;
 }
 
 // ----------------------------------------------------------------------------
@@ -275,10 +332,10 @@ async function transferIssues() {
 
   // get a list of all GitLab issues associated with this project
   // TODO return all issues via pagination
-  let issues = await gitlabApi.Issues.all({
+  let issues = (await gitlabApi.Issues.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any[];
+  })) as any[];
 
   // sort issues in ascending order of their issue number (by iid)
   issues = issues.sort((a, b) => a.iid - b.iid);
@@ -299,7 +356,7 @@ async function transferIssues() {
       // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
       if (issues[i].iid !== expectedIdx) {
         issues.splice(i, 0, createPlaceholderIssue(expectedIdx));
-        issueCounters.nrOfPlaceholderIssues++;
+        counters.nrOfPlaceholderIssues++;
         console.log(
           `Added placeholder issue for GitLab issue #${expectedIdx}.`
         );
@@ -342,10 +399,10 @@ async function transferIssues() {
               replacementIssue
             );
 
-            issueCounters.nrOfReplacementIssues++;
+            counters.nrOfReplacementIssues++;
             console.error('\t...DONE.');
           } catch (err) {
-            issueCounters.nrOfFailedIssues++;
+            counters.nrOfFailedIssues++;
             console.error(
               '\t...ERROR: Could not create replacement issue either!'
             );
@@ -368,14 +425,12 @@ async function transferIssues() {
   console.log(`\n\tStatistics:`);
   console.log(`\tTotal nr. of issues: ${issues.length}`);
   console.log(
-    `\tNr. of used placeholder issues: ${issueCounters.nrOfPlaceholderIssues}`
+    `\tNr. of used placeholder issues: ${counters.nrOfPlaceholderIssues}`
   );
   console.log(
-    `\tNr. of used replacement issues: ${issueCounters.nrOfReplacementIssues}`
+    `\tNr. of used replacement issues: ${counters.nrOfReplacementIssues}`
   );
-  console.log(
-    `\tNr. of issue migration fails: ${issueCounters.nrOfFailedIssues}`
-  );
+  console.log(`\tNr. of issue migration fails: ${counters.nrOfFailedIssues}`);
 }
 // ----------------------------------------------------------------------------
 
@@ -392,10 +447,10 @@ async function transferMergeRequests() {
 
   // Get a list of all pull requests (merge request equivalent) associated with
   // this project
-  let mergeRequests = await gitlabApi.MergeRequests.all({
+  let mergeRequests = (await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any;
+  })) as any;
 
   // Sort merge requests in ascending order of their number (by iid)
   mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
@@ -475,10 +530,10 @@ async function logMergeRequests(logFile) {
 
   // get a list of all GitLab merge requests associated with this project
   // TODO return all MRs via pagination
-  let mergeRequests = await gitlabApi.MergeRequests.all({
+  let mergeRequests = (await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any;
+  })) as any;
 
   // sort MRs in ascending order of when they were created (by id)
   mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);

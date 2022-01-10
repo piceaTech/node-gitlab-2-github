@@ -4,10 +4,10 @@ import * as mime from 'mime-types';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import S3 from 'aws-sdk/clients/s3';
-import GitlabHelper from './gitlabHelper';
+import { GitlabHelper } from './gitlabHelper';
 
 export const sleep = (milliseconds: number) => {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
 };
 
 /**
@@ -33,7 +33,12 @@ export const generateUserProjectRegex = () => {
 };
 
 // Creates new attachments and replaces old links
-export const migrateAttachments = async (body: string, githubRepoId: number | undefined, s3: S3Settings, gitlabHelper: GitlabHelper) => {
+export const migrateAttachments = async (
+  body: string,
+  githubRepoId: number | undefined,
+  s3: S3Settings,
+  gitlabHelper: GitlabHelper
+) => {
   const regexp = /(!?)\[([^\]]+)\]\((\/uploads[^)]+)\)/g;
 
   // Maps link offset to a new name in S3
@@ -60,8 +65,10 @@ export const migrateAttachments = async (body: string, githubRepoId: number | un
       // // Generate file name for S3 bucket from URL
       const hash = crypto.createHash('sha256');
       hash.update(url);
-      const newFileName = hash.digest('hex') + '/' + basename
-      const relativePath = githubRepoId ? `${githubRepoId}/${newFileName}` : newFileName;
+      const newFileName = hash.digest('hex') + '/' + basename;
+      const relativePath = githubRepoId
+        ? `${githubRepoId}/${newFileName}`
+        : newFileName;
       // Doesn't seem like it is easy to upload an issue to github, so upload to S3
       //https://stackoverflow.com/questions/41581151/how-to-upload-an-image-to-use-in-issue-comments-via-github-api
 
@@ -85,17 +92,21 @@ export const migrateAttachments = async (body: string, githubRepoId: number | un
           }
         });
       });
-    
+
       // Add the new URL to the map
       offsetToAttachment[match.index] = `${prefix}[${name}](${s3url})`;
     } else {
       // Not using S3: default to old URL, adding absolute path
-      const host = gitlabHelper.host.endsWith('/') 
-                    ? gitlabHelper.host : gitlabHelper.host + '/';
+      const host = gitlabHelper.host.endsWith('/')
+        ? gitlabHelper.host
+        : gitlabHelper.host + '/';
       const attachmentUrl = host + gitlabHelper.projectPath + url;
       offsetToAttachment[match.index] = `${prefix}[${name}](${attachmentUrl})`;
     }
   }
 
-  return body.replace(regexp, ({},{},{},{},offset,{}) => offsetToAttachment[offset]);
+  return body.replace(
+    regexp,
+    ({}, {}, {}, {}, offset, {}) => offsetToAttachment[offset]
+  );
 };

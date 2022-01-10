@@ -34,7 +34,7 @@ After doing this, the autolinking of issues, commits, and branches will work. Se
 
 ## Usage
 
-The user must be a member of the project you want to copy or else you won't see it in the first step.
+The user must be a member of the project you want to copy. This user must be the one
 
 1. `cp sample_settings.ts settings.ts`
 1. edit settings.ts
@@ -114,11 +114,15 @@ As default it is set to false. Doesn't fire the requests to github api and only 
 
 #### usePlaceholderIssuesForMissingIssues
 
-If this is set to true (default) then the migration process will automatically create empty dummy issues for every 'missing' GitLab issue (if you deleted an GitLab issue for example). Those issues will be closed on Github and they ensure, that the issue ids stay the same on both, GitLab and Github.
+If this is set to true (default) then the migration process will automatically create empty dummy issues for every 'missing' GitLab issue (if you deleted a GitLab issue for example). Those issues will be closed on Github and they ensure that the issue ids stay the same on both GitLab and Github.
+
+#### usePlaceholderMilestonesForMissingMilestones
+
+If this is set to true (default) then the migration process will automatically create empty dummy milestones for every 'missing' GitLab milestone (if you deleted a GitLab milestone for example). Those milestones will be closed on Github and they ensure that the milestone ids stay the same on both GitLab and Github.
 
 #### useReplacementIssuesForCreationFails
 
-If this is set to true (default) then the migration process will automatically create so called "replacement-issues" for every issue where the migration fails. This replacement issue will be exactly the same, but the original description will be lost. In the future, the description of the replacement issue will also contain a link to the original issue on GitLab. This way users, who still have access to the GitLab repository can still view its content. However, this is still an open task. (TODO)
+If this is set to true (default) then the migration process will automatically create so called "replacement-issues" for every issue where the migration fails. This replacement issue will be exactly the same, but the original description will be lost. In the future, the description of the replacement issue will also contain a link to the original issue on GitLab. This way, users who still have access to the GitLab repository can still view its content. However, this is still an open task. (TODO)
 
 It would of course be better to find the cause for migration fails, so that no replacement issues would be needed. Finding the cause together with a retry-mechanism would be optimal, and will maybe come in the future - currently the replacement-issue-mechanism helps to keep things in order.
 
@@ -150,11 +154,11 @@ Maps the usernames from gitlab to github. If the assinee of the gitlab issue is 
 
 ### projectmap
 
-When one renames the project while transfering so that the projects don't loose there links to the mentioned issues.
+This is useful when migrating multiple projects if they are renamed at destination. Provide a map from gitlab names to github names so that any cross-project references (e.g. issues) are not lost.
 
 ## Import limit
 
-Because Github has a limit of 5000 Api requests per hour one has to watch out that one doesn't get over this limit. I transferred one of my project with it ~ 300 issues with ~ 200 notes. This totals to some 500 objects excluding commits which are imported through githubs importer. I never got under 3800 remaining requests (while testing it two times in one hour).
+Because Github has a limit of 5000 Api requests per hour one has to be careful not to go over this limit. I transferred one of my project with it ~ 300 issues with ~ 200 notes. This totals to some 500 objects excluding commits which are imported through githubs importer. I never got under 3800 remaining requests (while testing it two times in one hour).
 
 So the rule of thumb should be that one can import a repo with ~ 2500 issues without a problem.
 
@@ -165,7 +169,9 @@ So the rule of thumb should be that one can import a repo with ~ 2500 issues wit
 See section 'useReplacementIssuesForCreationFails' above for more infos!
 One reason seems to be some error with `Octokit` (error message snippet: https://pastebin.com/3VNUNYLh)
 
-### Milestone refs and issue refs
+### Milestone, MR and issue references
+
+This is WIP
 
 the milestone refs and issue refs do not seem to be rewritten properly at the
 moment. specifically, milestones show up like `%4` in comments
@@ -182,6 +188,6 @@ A throttling mechanism could maybe help to avoid api rate limit errors.
 In some scenarios the ability to migrate is probably more important than the total
 duration of the migration process. Some users may even be willing to accept a very long duration (> 1 day if necessary?), if they can get the migration done at all, in return.
 
-### Make request run in parallel
+### Make requests run in parallel
 
-Some requests could be run in parallel, to shorten the total duration. Currently all GitLab- and Github-Api-Requests are being run sequentially.
+Some requests could be run in parallel, to shorten the total duration. Currently all GitLab- and Github-Api-Requests are run sequentially.

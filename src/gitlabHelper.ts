@@ -1,9 +1,18 @@
 import { Gitlab } from '@gitbeaker/node';
 import { GitlabSettings } from './settings';
 import axios from 'axios';
+// import { MilestoneSchema } from '@gitbeaker/core/dist/types/types';
+// export type Milestone = Partial<MilestoneSchema>;
 
+export interface Milestone {
+  id?: number; // internal gitlab identifier
+  iid: number; // milestone number, equivalent to github number
+  title: string;
+  description: string;
+  state: string;
+}
 
-export default class GitlabHelper {
+export class GitlabHelper {
   // Wait for this issue to be resolved
   // https://github.com/jdalrymple/gitbeaker/issues/793
   gitlabApi: InstanceType<typeof Gitlab>;
@@ -94,14 +103,17 @@ export default class GitlabHelper {
     try {
       const host = this.host.endsWith('/') ? this.host : this.host + '/';
       const attachmentUrl = host + this.projectPath + relurl;
-      const data = (await axios.get(attachmentUrl, {
+      const data = (
+        await axios.get(attachmentUrl, {
           responseType: 'arraybuffer',
           headers: {
             // HACK: work around GitLab's API lack of GET for attachments
             // See https://gitlab.com/gitlab-org/gitlab/-/issues/24155
-            Cookie: `_gitlab_session=${this.sessionCookie}`
-          }})).data;
-      return Buffer.from(data, 'binary')
+            Cookie: `_gitlab_session=${this.sessionCookie}`,
+          },
+        })
+      ).data;
+      return Buffer.from(data, 'binary');
     } catch (err) {
       console.error(`Could not download attachment #${relurl}.`);
       return null;
@@ -120,11 +132,11 @@ export default class GitlabHelper {
    */
   async getAllMergeRequestNotes(pullRequestIid: number) {
     try {
-      return (this.gitlabApi.MergeRequestNotes.all(
+      return this.gitlabApi.MergeRequestNotes.all(
         this.gitlabProjectId,
         pullRequestIid,
         {}
-      ) as any) as any[];
+      ) as any as any[];
     } catch (err) {
       console.error(
         `Could not fetch notes for GitLab merge request #${pullRequestIid}.`
