@@ -34,7 +34,7 @@ settings.ts
 merge-requests.json
 
 # ignore the lock
-package-lock.json
+#package-lock.json
 
 
 # Created by https://www.gitignore.io/api/visualstudiocode

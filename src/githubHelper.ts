@@ -1,9 +1,15 @@
 import settings from '../settings';
 import { GithubSettings } from './settings';
 import * as utils from './utils';
-import {Octokit as GitHubApi, RestEndpointMethodTypes} from '@octokit/rest';
-import { IssuesListForRepoResponseData, PullsListResponseData } from "@octokit/types";
+import { Octokit as GitHubApi, RestEndpointMethodTypes } from '@octokit/rest';
+import { Endpoints } from '@octokit/types';
 import GitlabHelper from './gitlabHelper';
+import { LabelSchema } from '@gitbeaker/core/dist/types/types';
+
+type IssuesListForRepoResponseData =
+  Endpoints['GET /repos/{owner}/{repo}/issues']['response']['data'];
+type PullsListResponseData =
+  Endpoints['GET /repos/{owner}/{repo}/pulls']['response']['data'];
 
 const gitHubLocation = 'https://github.com';
 
@@ -23,7 +29,9 @@ interface IssueImport {
   labels?: Array<string>;
 }
 
-export default class GithubHelper {
+export type SimpleLabel = Pick<LabelSchema, 'name' | 'color'>;
+
+export class GithubHelper {
   githubApi: GitHubApi;
   githubUrl: string;
   githubOwner: string;
@@ -36,10 +44,12 @@ export default class GithubHelper {
   delayInMs: number;
   useIssuesForAllMergeRequests: boolean;
 
-  constructor(githubApi: GitHubApi,
-              githubSettings: GithubSettings,
-              gitlabHelper: GitlabHelper,
-              useIssuesForAllMergeRequests: boolean) {
+  constructor(
+    githubApi: GitHubApi,
+    githubSettings: GithubSettings,
+    gitlabHelper: GitlabHelper,
+    useIssuesForAllMergeRequests: boolean
+  ) {
     this.githubApi = githubApi;
     this.githubUrl = githubSettings.baseUrl
       ? githubSettings.baseUrl
@@ -70,7 +80,7 @@ export default class GithubHelper {
       // get an array of GitHub milestones for the new repo
       let result = await this.githubApi.repos.get({
         owner: this.githubOwner,
-        repo: this.githubRepo
+        repo: this.githubRepo,
       });
 
       this.repoId = result.data.id;
@@ -232,9 +242,12 @@ export default class GithubHelper {
    * @param issue The GitLab issue object
    */
   async createIssue(milestones, issue) {
-    let bodyConverted = await this.convertIssuesAndComments(issue.description, issue);
+    let bodyConverted = await this.convertIssuesAndComments(
+      issue.description,
+      issue
+    );
 
-    let props : RestEndpointMethodTypes["issues"]["create"]["parameters"] = {
+    let props: RestEndpointMethodTypes['issues']['create']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
       title: issue.title.trim(),
@@ -517,8 +530,9 @@ export default class GithubHelper {
     }
 
     console.log(
-      `\t...Done creating issue comments (migrated ${nrOfMigratedNotes} comments, skipped ${notes.length -
-        nrOfMigratedNotes} comments)`
+      `\t...Done creating issue comments (migrated ${nrOfMigratedNotes} comments, skipped ${
+        notes.length - nrOfMigratedNotes
+      } comments)`
     );
   }
 
@@ -596,7 +610,7 @@ export default class GithubHelper {
     // default state is open so we don't have to update if the issue is closed.
     if (issue.state !== 'closed' || githubIssue.state === 'closed') return;
 
-    let props: RestEndpointMethodTypes["issues"]["update"]["parameters"] = {
+    let props: RestEndpointMethodTypes['issues']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
       issue_number: githubIssue.number,
@@ -619,13 +633,14 @@ export default class GithubHelper {
    */
   async createMilestone(milestone) {
     // convert from GitLab to GitHub
-    let githubMilestone : RestEndpointMethodTypes["issues"]["createMilestone"]["parameters"] = {
-      owner: this.githubOwner,
-      repo: this.githubRepo,
-      title: milestone.title,
-      description: milestone.description,
-      state: milestone.state === 'active' ? 'open' : 'closed',
-    };
+    let githubMilestone: RestEndpointMethodTypes['issues']['createMilestone']['parameters'] =
+      {
+        owner: this.githubOwner,
+        repo: this.githubRepo,
+        title: milestone.title,
+        description: milestone.description,
+        state: milestone.state === 'active' ? 'open' : 'closed',
+      };
 
     if (milestone.due_date) {
       githubMilestone.due_on = milestone.due_date + 'T00:00:00Z';
@@ -643,7 +658,7 @@ export default class GithubHelper {
   /**
    * Create a GitHub label from a GitLab label
    */
-  async createLabel(label) {
+  async createLabel(label: SimpleLabel) {
     // convert from GitLab to GitHub
     let githubLabel = {
       owner: this.githubOwner,
@@ -782,13 +797,13 @@ export default class GithubHelper {
         await this.githubApi.pulls.create(props);
         return Promise.resolve({ data: null }); // need to return null promise for parent to wait on
       } catch (err) {
-        if(err.status === 422) {
+        if (err.status === 422) {
           console.error(
             `Pull request #${pullRequest.iid} - attempt to create has failed, assume '${pullRequest.source_branch}' has already been merged => cannot migrate pull request, creating an issue instead.`
           );
           // fall through to next section
         } else {
-          throw (err);
+          throw err;
         }
       }
     }
@@ -899,8 +914,9 @@ export default class GithubHelper {
     }
 
     console.log(
-      `\t...Done creating pull request comments (migrated ${nrOfMigratedNotes} pull request comments, skipped ${notes.length -
-        nrOfMigratedNotes} pull request comments)`
+      `\t...Done creating pull request comments (migrated ${nrOfMigratedNotes} pull request comments, skipped ${
+        notes.length - nrOfMigratedNotes
+      } pull request comments)`
     );
   }
 
@@ -915,7 +931,7 @@ export default class GithubHelper {
    * @returns {Promise<Github.Response<Github.IssuesUpdateResponse>>}
    */
   async updatePullRequestData(githubPullRequest, pullRequest, milestones) {
-    let props: RestEndpointMethodTypes["issues"]["update"]["parameters"] = {
+    let props: RestEndpointMethodTypes['issues']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
       issue_number: githubPullRequest.number || githubPullRequest.iid,
@@ -994,7 +1010,7 @@ export default class GithubHelper {
     if (pullRequest.state !== 'closed' || githubPullRequest.state === 'closed')
       return;
 
-    let props : RestEndpointMethodTypes["issues"]["update"]["parameters"] = {
+    let props: RestEndpointMethodTypes['issues']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
       issue_number: githubPullRequest.number,
@@ -1084,7 +1100,12 @@ export default class GithubHelper {
         }
       );
 
-      strWithMigLine = await utils.migrateAttachments(strWithMigLine, this.repoId, settings.s3, this.gitlabHelper);
+      strWithMigLine = await utils.migrateAttachments(
+        strWithMigLine,
+        this.repoId,
+        settings.s3,
+        this.gitlabHelper
+      );
 
       return strWithMigLine;
     }
@@ -1158,10 +1179,7 @@ export default class GithubHelper {
         line = position.old_line;
       }
       const crypto = require('crypto');
-      const hash = crypto
-        .createHash('md5')
-        .update(path)
-        .digest('hex');
+      const hash = crypto.createHash('md5').update(path).digest('hex');
       slug = `#diff-${hash}${side}${line}`;
     }
     // Mention the file and line number. If we can't get this for some reason then use the commit id instead.
