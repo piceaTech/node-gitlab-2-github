@@ -4,6 +4,7 @@ import * as utils from './utils';
 import { Octokit as GitHubApi, RestEndpointMethodTypes } from '@octokit/rest';
 import { Endpoints } from '@octokit/types';
 import GitlabHelper from './gitlabHelper';
+import { LabelSchema } from '@gitbeaker/core/dist/types/types';
 
 type IssuesListForRepoResponseData =
   Endpoints['GET /repos/{owner}/{repo}/issues']['response']['data'];
@@ -12,7 +13,9 @@ type PullsListResponseData =
 
 const gitHubLocation = 'https://github.com';
 
-export default class GithubHelper {
+export type SimpleLabel = Pick<LabelSchema, 'name' | 'color'>;
+
+export class GithubHelper {
   githubApi: GitHubApi;
   githubUrl: string;
   githubOwner: string;
@@ -454,7 +457,7 @@ export default class GithubHelper {
   /**
    * Create a GitHub label from a GitLab label
    */
-  async createLabel(label) {
+  async createLabel(label: SimpleLabel) {
     // convert from GitLab to GitHub
     let githubLabel = {
       owner: this.githubOwner,

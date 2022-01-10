@@ -1,4 +1,4 @@
-import GithubHelper from './githubHelper';
+import { GithubHelper, SimpleLabel } from './githubHelper';
 import GitlabHelper from './gitlabHelper';
 import settings from '../settings';
 
@@ -10,9 +10,6 @@ import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
 import { sleep } from './utils';
-import { LabelSchema } from '@gitbeaker/core/dist/types/types';
-
-type Label = Pick<LabelSchema, 'name' | 'color' | 'description'>;
 
 const issueCounters = {
   nrOfPlaceholderIssues: 0,
@@ -228,7 +225,9 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   inform('Transferring Labels');
 
   // Get a list of all labels associated with this project
-  let labels: Label[] = await gitlabApi.Labels.all(settings.gitlab.projectId);
+  let labels: SimpleLabel[] = await gitlabApi.Labels.all(
+    settings.gitlab.projectId
+  );
 
   // get a list of the current label names in the new GitHub repo (likely to be just the defaults)
   let githubLabels: string[] = await githubHelper.getAllGithubLabelNames();
@@ -238,7 +237,6 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
     const hasAttachmentLabel = {
       name: 'has attachment',
       color: '#fbca04',
-      description: 'Issue has attachments which might not have been migrated',
     };
     labels.push(hasAttachmentLabel);
   }
@@ -246,8 +244,6 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   const gitlabMergeRequestLabel = {
     name: 'gitlab merge request',
     color: '#b36b00',
-    description:
-      'An issue replacing a merge request which cannot be migrated because of deleted branches',
   };
   labels.push(gitlabMergeRequestLabel);
 
