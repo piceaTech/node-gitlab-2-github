@@ -437,6 +437,10 @@ async function transferMergeRequests() {
       i => i.title.trim().includes(request.title.trim())
     );
     if (!githubRequest && !githubIssue) {
+      if (settings.skipMergeRequestStates.includes(request.state)) {
+          console.log(`Skipping MR ${request.iid} in "${request.state}" state: ${request.title}`)
+          continue;
+        }
       console.log(
         'Creating pull request: !' + request.iid + ' - ' + request.title
       );

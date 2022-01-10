@@ -155,6 +155,10 @@ used to sidestep the problem where pull requests are rejected by GitHub if the f
 
 Filters all merge requests and issues by these labels. The applicable values can be found in the Gitlab API documentation for [issues](https://docs.gitlab.com/ee/api/issues.html#list-project-issues) and [merge requests](https://docs.gitlab.com/ee/api/merge_requests.html#list-merge-requests) respectively. Default is `null` which returns all issues/merge requests.
 
+### skipMergeRequestStates
+
+Merge requests in GitLab with any of the states listed in this array will not be transferred to GitHub (e.g. set to `['merged', 'closed']` to avoid creating issues for closed MRs whose branches have been deleted).
+
 ### skipMatchingComments
 
 This is an array (empty per default) that may contain string values. Any note/comment in any issue, that contains one or more of those string values, will be skipped (meaining not migrated). Note that this is case insensitive, therefore the string value `foo` would also lead to skipping notes containing a (sub)string `FOO`.
