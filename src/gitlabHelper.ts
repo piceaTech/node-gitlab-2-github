@@ -11,9 +11,11 @@ export default class GitlabHelper {
   gitlabUrl?: string;
   gitlabToken: string;
   gitlabProjectId: number;
+  sessionCookie: string;
 
   host: string;
   projectPath?: string;
+  allBranches: any;
 
   constructor(
     gitlabApi: InstanceType<typeof Gitlab>,
@@ -24,6 +26,8 @@ export default class GitlabHelper {
     this.gitlabToken = gitlabSettings.token;
     this.gitlabProjectId = gitlabSettings.projectId;
     this.host = gitlabSettings.url ? gitlabSettings.url : 'http://gitlab.com';
+    this.sessionCookie = gitlabSettings.sessionCookie;
+    this.allBranches = null;
   }
 
   /**
@@ -92,7 +96,13 @@ export default class GitlabHelper {
     try {
       const host = this.host.endsWith('/') ? this.host : this.host + '/';
       const attachmentUrl = host + this.projectPath + relurl;
-      const data = (await axios.get(attachmentUrl, {responseType: 'arraybuffer'})).data;
+      const data = (await axios.get(attachmentUrl, {
+          responseType: 'arraybuffer',
+          headers: {
+            // HACK: work around GitLab's API lack of GET for attachments
+            // See https://gitlab.com/gitlab-org/gitlab/-/issues/24155
+            Cookie: `_gitlab_session=${this.sessionCookie}`
+          }})).data;
       return Buffer.from(data, 'binary')
     } catch (err) {
       console.error(`Could not download attachment #${relurl}.`);
@@ -104,7 +114,10 @@ export default class GitlabHelper {
    * Gets all branches.
    */
   async getAllBranches() {
-    return (await this.gitlabApi.Branches.all(this.gitlabProjectId)) as any[];
+    if (!this.allBranches){
+      this.allBranches = await this.gitlabApi.Branches.all(this.gitlabProjectId);
+    }
+    return this.allBranches as any[];
   }
 
   /**

@@ -5,11 +5,13 @@ export default {
     // url: 'https://gitlab.mycompany.com',
     token: '{{gitlab private token}}',
     projectId: null,
+    sessionCookie: null,
   },
   github: {
     // baseUrl: 'https://gitlab.mycompany.com:123/etc',
     owner: '{{repository owner (user or organization)}}',
     token: '{{token}}',
+    token_owner: '{{token_owner}}',
     repo: '{{repo}}',
   },
   s3: {
@@ -35,6 +37,7 @@ export default {
     mergeRequests: true,
   },
   debug: false,
+  useIssueImportAPI: true,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,

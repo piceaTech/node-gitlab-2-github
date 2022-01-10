@@ -1,14 +1,15 @@
-import GithubHelper from './githubHelper';
+import { GithubHelper, SimpleLabel } from './githubHelper';
 import GitlabHelper from './gitlabHelper';
 import settings from '../settings';
 
-import {Octokit as GitHubApi} from '@octokit/rest';
-import { Gitlab } from '@gitbeaker/node'
+import { Octokit as GitHubApi } from '@octokit/rest';
+import { throttling } from '@octokit/plugin-throttling';
+import { Gitlab } from '@gitbeaker/node';
 
 import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
-
+import { sleep } from './utils';
 
 const issueCounters = {
   nrOfPlaceholderIssues: 0,
@@ -17,8 +18,10 @@ const issueCounters = {
 };
 
 if (settings.s3) {
-  AWS.config.accessKeyId = settings.s3.accessKeyId;
-  AWS.config.secretAccessKey = settings.s3.secretAccessKey;
+  AWS.config.credentials = new AWS.Credentials({
+    accessKeyId: settings.s3.accessKeyId,
+    secretAccessKey: settings.s3.secretAccessKey,
+  });
 }
 
 //let settings = null;
@@ -51,8 +54,11 @@ const gitlabApi = new Gitlab({
   token: settings.gitlab.token,
 });
 
+const MyOctokit = GitHubApi.plugin(throttling);
+
 // Create a GitHub API object
-const githubApi = new GitHubApi({
+const githubApi = new MyOctokit({
+  previews: settings.useIssueImportAPI ? ["golden-comet"] : [],
   debug: false,
   baseUrl: settings.github.baseUrl
     ? settings.github.baseUrl
@@ -63,13 +69,31 @@ const githubApi = new GitHubApi({
     accept: 'application/vnd.github.v3+json',
   },
   auth: 'token ' + settings.github.token,
+  throttle: {
+    onRateLimit: async (retryAfter, options) => {
+      console.log(
+        `Request quota exhausted for request ${options.method} ${options.url}`
+      );
+      await sleep(60000);
+      return true;
+    },
+    onAbuseLimit: async (retryAfter, options) => {
+      console.log(
+        `Abuse detected for request ${options.method} ${options.url}`
+      );
+      await sleep(60000);
+      return true;
+    },
+  },
 });
 
 const gitlabHelper = new GitlabHelper(gitlabApi, settings.gitlab);
-const githubHelper = new GithubHelper(githubApi,
-                                      settings.github,
-                                      gitlabHelper,
-                                      settings.useIssuesForAllMergeRequests);
+const githubHelper = new GithubHelper(
+  githubApi,
+  settings.github,
+  gitlabHelper,
+  settings.useIssuesForAllMergeRequests
+);
 
 // If no project id is given in settings.js, just return
 // all of the projects that this user is associated with.
@@ -124,8 +148,8 @@ async function migrate() {
   //
 
   try {
-
     await githubHelper.registerRepoId();
+    await gitlabHelper.registerProjectPath(settings.gitlab.projectId);
 
     // transfer GitLab milestones to GitHub
     if (settings.transfer.milestones) {
@@ -202,18 +226,22 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   inform('Transferring Labels');
 
   // Get a list of all labels associated with this project
-  let labels = await gitlabApi.Labels.all(settings.gitlab.projectId);
+  let labels: SimpleLabel[] = await gitlabApi.Labels.all(
+    settings.gitlab.projectId
+  );
 
   // get a list of the current label names in the new GitHub repo (likely to be just the defaults)
-  let githubLabels = await githubHelper.getAllGithubLabelNames();
+  let githubLabels: string[] = await githubHelper.getAllGithubLabelNames();
 
   // create a hasAttachment label for manual attachment migration
   if (attachmentLabel) {
-    const hasAttachmentLabel = { name: 'has attachment', color: '#fbca04' };
+    const hasAttachmentLabel = {
+      name: 'has attachment',
+      color: '#fbca04',
+    };
     labels.push(hasAttachmentLabel);
   }
 
-  // create gitlabMergeRequest label for non-migratable merge requests
   const gitlabMergeRequestLabel = {
     name: 'gitlab merge request',
     color: '#b36b00',
@@ -250,17 +278,15 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
 async function transferIssues() {
   inform('Transferring Issues');
 
-  await gitlabHelper. registerProjectPath(settings.gitlab.projectId);
-
   // Because each
   let milestoneData = await githubHelper.getAllGithubMilestones();
 
   // get a list of all GitLab issues associated with this project
   // TODO return all issues via pagination
-  let issues = await gitlabApi.Issues.all({
+  let issues = (await gitlabApi.Issues.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any[];
+  })) as any[];
 
   // sort issues in ascending order of their issue number (by iid)
   issues = issues.sort((a, b) => a.iid - b.iid);
@@ -374,10 +400,10 @@ async function transferMergeRequests() {
 
   // Get a list of all pull requests (merge request equivalent) associated with
   // this project
-  let mergeRequests = await gitlabApi.MergeRequests.all({
+  let mergeRequests = (await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any;
+  })) as any;
 
   // Sort merge requests in ascending order of their number (by iid)
   mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
@@ -461,10 +487,10 @@ async function logMergeRequests(logFile) {
 
   // get a list of all GitLab merge requests associated with this project
   // TODO return all MRs via pagination
-  let mergeRequests = await gitlabApi.MergeRequests.all({
+  let mergeRequests = (await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  }) as any;
+  })) as any;
 
   // sort MRs in ascending order of when they were created (by id)
   mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);

@@ -17,6 +17,7 @@ export default interface Settings {
     issues: boolean;
     mergeRequests: boolean;
   };
+  useIssueImportAPI: boolean;
   usePlaceholderIssuesForMissingIssues: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;
@@ -34,6 +35,7 @@ export interface GithubSettings {
   baseUrl?: string;
   owner: string;
   token: string;
+  token_owner: string;
   repo: string;
   timeout?: number;
   username?: string; // when is this set???
@@ -43,6 +45,7 @@ export interface GitlabSettings {
   url?: string;
   token: string;
   projectId: number;
+  sessionCookie: string;
 }
 
 export interface S3Settings {
