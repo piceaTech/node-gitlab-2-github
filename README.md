@@ -96,6 +96,22 @@ IAM User who owns these credential must have [write permissions](https://docs.aw
 
 Existing bucket, with an appropriate security policy. One possible policy is to allow [public access](https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteAccessPermissionsReqd.html).
 
+### usermap
+
+Maps the usernames from gitlab to github. If the assinee of the gitlab issue is equal to the one currently logged in github it will also get assigned without a usermap. The Mentions in issues will also be translated to the new github name.
+
+### projectmap
+
+When one renames the project while transfering so that the projects don't loose there links to the mentioned issues.
+
+### conversion
+
+#### conversion.useLowerCaseLabels
+
+If this is set to true (default) then labels from GitLab will be converted to lowercase in GitHub.
+
+### transfer
+
 #### transfer.milestones
 
 If this is set to true (default) then the migration process will transfer milestones.
@@ -112,34 +128,34 @@ If this is set to true (default) then the migration process will transfer issues
 
 If this is set to true (default) then the migration process will transfer merge requests.
 
-#### debug
+### debug
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls
 
-#### useIssueImportAPI
+### useIssueImportAPI
 
 Set to true (default) to enable using the [GitHub preview API for importing issues](https://gist.github.com/jonmagic/5282384165e0f86ef105). This allows setting the date for issues and comments instead of inserting an additional line in the body.
 
-#### usePlaceholderIssuesForMissingIssues
+### usePlaceholderIssuesForMissingIssues
 
 If this is set to true (default) then the migration process will automatically create empty dummy issues for every 'missing' GitLab issue (if you deleted an GitLab issue for example). Those issues will be closed on Github and they ensure, that the issue ids stay the same on both, GitLab and Github.
 
-#### useReplacementIssuesForCreationFails
+### useReplacementIssuesForCreationFails
 
 If this is set to true (default) then the migration process will automatically create so called "replacement-issues" for every issue where the migration fails. This replacement issue will be exactly the same, but the original description will be lost. In the future, the description of the replacement issue will also contain a link to the original issue on GitLab. This way users, who still have access to the GitLab repository can still view its content. However, this is still an open task. (TODO)
 
 It would of course be better to find the cause for migration fails, so that no replacement issues would be needed. Finding the cause together with a retry-mechanism would be optimal, and will maybe come in the future - currently the replacement-issue-mechanism helps to keep things in order.
 
-#### useIssuesForAllMergeRequests
+### useIssuesForAllMergeRequests
 
 If this is set to true (default is false) then all merge requests will be migrated as GitHub issues (rather than pull requests). This can be
 used to sidestep the problem where pull requests are rejected by GitHub if the feature branch no longer exists or has been merged.
 
-#### filterByLabel
+### filterByLabel
 
 Filters all merge requests and issues by these labels. The applicable values can be found in the Gitlab API documentation for [issues](https://docs.gitlab.com/ee/api/issues.html#list-project-issues) and [merge requests](https://docs.gitlab.com/ee/api/merge_requests.html#list-merge-requests) respectively. Default is `null` which returns all issues/merge requests.
 
-#### skipMatchingComments
+### skipMatchingComments
 
 This is an array (empty per default) that may contain string values. Any note/comment in any issue, that contains one or more of those string values, will be skipped (meaining not migrated). Note that this is case insensitive, therefore the string value `foo` would also lead to skipping notes containing a (sub)string `FOO`.
 
@@ -148,17 +164,9 @@ Suggested values:
 - `time spent`, since those kind of terms can be used in GitLab to track time, they are rather meaningless in Github though
 - action entries, such as `changed the description`, `added 1 commit`, `mentioned in merge request`, etc as they are interpreted as comments
 
-#### mergeRequests
+### mergeRequests
 
 Object consisting of `logfile` and `log`. If `log` is set to true, then the merge requests are logged in the specified file and not migrated. Conversely, if `log` is set to false, then the merge requests are migrated to GitHub and not logged. If the source or target branches linked to the merge request have been deleted, the merge request cannot be migrated to a pull request; instead, an issue with a custom "gitlab merge request" tag is created with the full comment history of the merge request.
-
-### usermap
-
-Maps the usernames from gitlab to github. If the assinee of the gitlab issue is equal to the one currently logged in github it will also get assigned without a usermap. The Mentions in issues will also be translated to the new github name.
-
-### projectmap
-
-When one renames the project while transfering so that the projects don't loose there links to the mentioned issues.
 
 ## Import limit
 
