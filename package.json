@@ -4,6 +4,7 @@
   "description": "Migrate Issues, Wiki from gitlab to github",
   "main": "index.js",
   "scripts": {
+    "prepare": "husky install",
     "start": "node node_modules/ts-node/dist/bin.js ./src/index.ts"
   },
   "repository": {
