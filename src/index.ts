@@ -58,6 +58,7 @@ const MyOctokit = GitHubApi.plugin(throttling);
 
 // Create a GitHub API object
 const githubApi = new MyOctokit({
+  previews: settings.useIssueImportAPI ? ["golden-comet"] : [],
   debug: false,
   baseUrl: settings.github.baseUrl
     ? settings.github.baseUrl
