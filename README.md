@@ -128,6 +128,12 @@ If this is set to true (default) then the migration process will transfer issues
 
 If this is set to true (default) then the migration process will transfer merge requests.
 
+#### transfer.releases
+
+If this is set to true (default) then the migration process will transfer releases.
+Note that github api for releases is limited and hence this will only transfer the title and description of the releases
+and add them to github in chronological order, but it would not preserve the original release dates, nor transfer artefacts or assets.
+
 ### debug
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls

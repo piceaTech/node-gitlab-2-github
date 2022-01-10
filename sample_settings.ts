@@ -35,6 +35,7 @@ export default {
     labels: true,
     issues: true,
     mergeRequests: true,
+    releases: true,
   },
   debug: false,
   useIssueImportAPI: true,
