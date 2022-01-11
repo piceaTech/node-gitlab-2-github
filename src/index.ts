@@ -25,19 +25,6 @@ if (settings.s3) {
   });
 }
 
-//let settings = null;
-try {
-  //settings = require('../settings.js');
-} catch (e) {
-  if (e.code === 'MODULE_NOT_FOUND') {
-    console.log('\n\nPlease copy the sample_settings.js to settings.js.');
-  } else {
-    console.log(e);
-  }
-
-  process.exit(1);
-}
-
 // Ensure that the GitLab token has been set in settings.js
 if (
   !settings.gitlab.token ||

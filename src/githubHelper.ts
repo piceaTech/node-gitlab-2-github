@@ -121,11 +121,7 @@ export class GithubHelper {
         state: 'all',
       });
 
-      // extract the milestone number and title and put into a new array
-      return result.data.map(x => ({
-        number: x.number,
-        title: x.title,
-      }));
+      return result.data.map(x => ({ number: x.number, title: x.title }));
     } catch (err) {
       console.error('Could not access all GitHub milestones');
       console.error(err);
