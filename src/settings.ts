@@ -16,12 +16,15 @@ export default interface Settings {
     labels: boolean;
     issues: boolean;
     mergeRequests: boolean;
+    releases: boolean;
   };
+  useIssueImportAPI: boolean;
   usePlaceholderMilestonesForMissingMilestones: boolean;
   usePlaceholderIssuesForMissingIssues: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;
   filterByLabel: string | null;
+  skipMergeRequestStates: string[];
   skipMatchingComments: string[];
   mergeRequests: {
     logFile: string;
@@ -34,6 +37,7 @@ export interface GithubSettings {
   baseUrl?: string;
   owner: string;
   token: string;
+  token_owner: string;
   repo: string;
   timeout?: number;
   username?: string; // when is this set???

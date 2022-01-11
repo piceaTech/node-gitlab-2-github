@@ -1,4 +1,4 @@
-import { GithubHelper } from './githubHelper';
+import { GithubHelper, SimpleLabel } from './githubHelper';
 import { GitlabHelper, Milestone } from './gitlabHelper';
 import settings from '../settings';
 
@@ -19,8 +19,10 @@ const counters = {
 };
 
 if (settings.s3) {
-  AWS.config.accessKeyId = settings.s3.accessKeyId;
-  AWS.config.secretAccessKey = settings.s3.secretAccessKey;
+  AWS.config.credentials = new AWS.Credentials({
+    accessKeyId: settings.s3.accessKeyId,
+    secretAccessKey: settings.s3.secretAccessKey,
+  });
 }
 
 //let settings = null;
@@ -57,6 +59,7 @@ const MyOctokit = GitHubApi.plugin(throttling);
 
 // Create a GitHub API object
 const githubApi = new MyOctokit({
+  previews: settings.useIssueImportAPI ? ["golden-comet"] : [],
   debug: false,
   baseUrl: settings.github.baseUrl
     ? settings.github.baseUrl
@@ -182,6 +185,13 @@ async function migrate() {
       await transferLabels(true, settings.conversion.useLowerCaseLabels);
     }
 
+
+    // transfer GitLab releases to GitHub
+    if (settings.transfer.releases) {
+      await transferReleases();
+    }
+
+
     // Transfer issues with their comments; do this before transferring the merge requests
     if (settings.transfer.issues) {
       await transferIssues();
@@ -279,18 +289,22 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   inform('Transferring Labels');
 
   // Get a list of all labels associated with this project
-  let labels = await gitlabApi.Labels.all(settings.gitlab.projectId);
+  let labels: SimpleLabel[] = await gitlabApi.Labels.all(
+    settings.gitlab.projectId
+  );
 
   // get a list of the current label names in the new GitHub repo (likely to be just the defaults)
-  let githubLabels = await githubHelper.getAllGithubLabelNames();
+  let githubLabels: string[] = await githubHelper.getAllGithubLabelNames();
 
   // create a hasAttachment label for manual attachment migration
   if (attachmentLabel) {
-    const hasAttachmentLabel = { name: 'has attachment', color: '#fbca04' };
+    const hasAttachmentLabel = {
+      name: 'has attachment',
+      color: '#fbca04',
+    };
     labels.push(hasAttachmentLabel);
   }
 
-  // create gitlabMergeRequest label for non-migratable merge requests
   const gitlabMergeRequestLabel = {
     name: 'gitlab merge request',
     color: '#b36b00',
@@ -484,6 +498,10 @@ async function transferMergeRequests() {
       i => i.title.trim().includes(request.title.trim())
     );
     if (!githubRequest && !githubIssue) {
+      if (settings.skipMergeRequestStates.includes(request.state)) {
+          console.log(`Skipping MR ${request.iid} in "${request.state}" state: ${request.title}`)
+          continue;
+        }
       console.log(
         'Creating pull request: !' + request.iid + ' - ' + request.title
       );
@@ -516,6 +534,61 @@ async function transferMergeRequests() {
             request.title
         );
       }
+    }
+  }
+}
+
+/**
+ * Transfer any releases that exist in GitLab that do not exist in GitHub
+ * Please note that due to github api restrictions, this only transfers the 
+ * name, description and tag name of the release. It sorts the releases chronologically
+ * and creates them on github one by one
+ * @returns {Promise<void>}
+ */
+ async function transferReleases() {
+  inform('Transferring Releases');
+
+  // Get a list of all releases associated with this project
+  let releases = await gitlabApi.Releases.all(settings.gitlab.projectId) as any;
+
+  // Sort releases in ascending order of their release date
+  releases = releases.sort((a, b) => {
+    return (new Date(a.released_at) as any) - (new Date(b.released_at) as any);
+  });
+
+  console.log(
+    'Transferring ' + releases.length.toString() + ' releases'
+  );
+
+  //
+  // Create GitHub release for each GitLab release
+  //
+
+  // if a GitLab release does not exist in GitHub repo, create it
+  for (let release of releases) {
+    // Try to find an existing github release that already exists for this GitLab
+    // release
+    let githubRelease = await githubHelper.getReleaseByTag(release.tag_name);
+    
+    if (!githubRelease) {
+      console.log(
+        'Creating release: !' + release.name + ' - ' + release.tag_name
+      );
+      try {
+        // process asynchronous code in sequence
+        await githubHelper.createRelease(release.tag_name, release.name, release.description);
+      } catch (err) {
+        console.error(
+          'Could not create release: !' +
+          release.name + ' - ' + release.tag_name
+        );
+        console.error(err);
+      }
+    } else {
+        console.log(
+          'Gitlab release already exists (as github release): ' +
+          githubRelease.data.name + ' - ' + githubRelease.data.tag_name
+        );
     }
   }
 }
