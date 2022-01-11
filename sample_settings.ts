@@ -31,6 +31,7 @@ export default {
     useLowerCaseLabels: true,
   },
   transfer: {
+    description: true,
     milestones: true,
     labels: true,
     issues: true,

@@ -151,6 +151,11 @@ async function migrate() {
     await githubHelper.registerRepoId();
     await gitlabHelper.registerProjectPath(settings.gitlab.projectId);
 
+    // transfer GitLab description to GitHub
+    if (settings.transfer.description) {
+      await transferDescription();
+    }
+
     // transfer GitLab milestones to GitHub
     if (settings.transfer.milestones) {
       await transferMilestones();
@@ -186,6 +191,22 @@ async function migrate() {
   }
 
   console.log('\n\nTransfer complete!\n\n');
+}
+
+// ----------------------------------------------------------------------------
+
+/**
+ * Transfer the description of the repository.
+ */
+async function transferDescription() {
+  inform('Transferring Description');
+
+  // Get the description of this project
+  let project = await gitlabApi.Projects.show(
+    settings.gitlab.projectId
+  ) as any;
+
+  await githubHelper.updateRepositoryDescription(project.description);
 }
 
 // ----------------------------------------------------------------------------
