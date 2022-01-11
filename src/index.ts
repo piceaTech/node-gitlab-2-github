@@ -1,5 +1,5 @@
-import { GithubHelper, SimpleLabel } from './githubHelper';
-import { GitlabHelper, Milestone } from './gitlabHelper';
+import { GithubHelper, MilestoneImport, SimpleLabel } from './githubHelper';
+import { GitlabHelper } from './gitlabHelper';
 import settings from '../settings';
 
 import { Octokit as GitHubApi } from '@octokit/rest';
@@ -59,7 +59,7 @@ const MyOctokit = GitHubApi.plugin(throttling);
 
 // Create a GitHub API object
 const githubApi = new MyOctokit({
-  previews: settings.useIssueImportAPI ? ["golden-comet"] : [],
+  previews: settings.useIssueImportAPI ? ['golden-comet'] : [],
   debug: false,
   baseUrl: settings.github.baseUrl
     ? settings.github.baseUrl
@@ -113,7 +113,7 @@ if (!settings.gitlab.projectId) {
  * @param expectedIdx Number of the GitLab milestone
  * @returns Data for the milestone
  */
-function createPlaceholderMilestone(expectedIdx: number): Milestone {
+function createPlaceholderMilestone(expectedIdx: number): MilestoneImport {
   return {
     iid: expectedIdx,
     title: `[PLACEHOLDER] - for milestone #${expectedIdx}`,
@@ -185,12 +185,10 @@ async function migrate() {
       await transferLabels(true, settings.conversion.useLowerCaseLabels);
     }
 
-
     // transfer GitLab releases to GitHub
     if (settings.transfer.releases) {
       await transferReleases();
     }
-
 
     // Transfer issues with their comments; do this before transferring the merge requests
     if (settings.transfer.issues) {
@@ -223,7 +221,7 @@ async function transferMilestones(
   inform('Transferring Milestones');
 
   // Get a list of all milestones associated with this project
-  let milestones: Milestone[] = await gitlabApi.ProjectMilestones.all(
+  let milestones: MilestoneImport[] = await gitlabApi.ProjectMilestones.all(
     settings.gitlab.projectId
   );
 
@@ -499,9 +497,11 @@ async function transferMergeRequests() {
     );
     if (!githubRequest && !githubIssue) {
       if (settings.skipMergeRequestStates.includes(request.state)) {
-          console.log(`Skipping MR ${request.iid} in "${request.state}" state: ${request.title}`)
-          continue;
-        }
+        console.log(
+          `Skipping MR ${request.iid} in "${request.state}" state: ${request.title}`
+        );
+        continue;
+      }
       console.log(
         'Creating pull request: !' + request.iid + ' - ' + request.title
       );
@@ -540,25 +540,25 @@ async function transferMergeRequests() {
 
 /**
  * Transfer any releases that exist in GitLab that do not exist in GitHub
- * Please note that due to github api restrictions, this only transfers the 
+ * Please note that due to github api restrictions, this only transfers the
  * name, description and tag name of the release. It sorts the releases chronologically
  * and creates them on github one by one
  * @returns {Promise<void>}
  */
- async function transferReleases() {
+async function transferReleases() {
   inform('Transferring Releases');
 
   // Get a list of all releases associated with this project
-  let releases = await gitlabApi.Releases.all(settings.gitlab.projectId) as any;
+  let releases = (await gitlabApi.Releases.all(
+    settings.gitlab.projectId
+  )) as any;
 
   // Sort releases in ascending order of their release date
   releases = releases.sort((a, b) => {
     return (new Date(a.released_at) as any) - (new Date(b.released_at) as any);
   });
 
-  console.log(
-    'Transferring ' + releases.length.toString() + ' releases'
-  );
+  console.log('Transferring ' + releases.length.toString() + ' releases');
 
   //
   // Create GitHub release for each GitLab release
@@ -569,26 +569,34 @@ async function transferMergeRequests() {
     // Try to find an existing github release that already exists for this GitLab
     // release
     let githubRelease = await githubHelper.getReleaseByTag(release.tag_name);
-    
+
     if (!githubRelease) {
       console.log(
         'Creating release: !' + release.name + ' - ' + release.tag_name
       );
       try {
         // process asynchronous code in sequence
-        await githubHelper.createRelease(release.tag_name, release.name, release.description);
+        await githubHelper.createRelease(
+          release.tag_name,
+          release.name,
+          release.description
+        );
       } catch (err) {
         console.error(
           'Could not create release: !' +
-          release.name + ' - ' + release.tag_name
+            release.name +
+            ' - ' +
+            release.tag_name
         );
         console.error(err);
       }
     } else {
-        console.log(
-          'Gitlab release already exists (as github release): ' +
-          githubRelease.data.name + ' - ' + githubRelease.data.tag_name
-        );
+      console.log(
+        'Gitlab release already exists (as github release): ' +
+          githubRelease.data.name +
+          ' - ' +
+          githubRelease.data.tag_name
+      );
     }
   }
 }

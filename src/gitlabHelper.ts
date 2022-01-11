@@ -1,16 +1,6 @@
 import { Gitlab } from '@gitbeaker/node';
 import { GitlabSettings } from './settings';
 import axios from 'axios';
-// import { MilestoneSchema } from '@gitbeaker/core/dist/types/types';
-// export type Milestone = Partial<MilestoneSchema>;
-
-export interface Milestone {
-  id?: number; // internal gitlab identifier
-  iid: number; // milestone number, equivalent to github number
-  title: string;
-  description: string;
-  state: string;
-}
 
 export class GitlabHelper {
   // Wait for this issue to be resolved
@@ -126,8 +116,10 @@ export class GitlabHelper {
    * Gets all branches.
    */
   async getAllBranches() {
-    if (!this.allBranches){
-      this.allBranches = await this.gitlabApi.Branches.all(this.gitlabProjectId);
+    if (!this.allBranches) {
+      this.allBranches = await this.gitlabApi.Branches.all(
+        this.gitlabProjectId
+      );
     }
     return this.allBranches as any[];
   }

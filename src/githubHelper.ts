@@ -4,7 +4,6 @@ import * as utils from './utils';
 import { Octokit as GitHubApi, RestEndpointMethodTypes } from '@octokit/rest';
 import { Endpoints } from '@octokit/types';
 import { GitlabHelper } from './gitlabHelper';
-import { LabelSchema } from '@gitbeaker/core/dist/types/types';
 
 type IssuesListForRepoResponseData =
   Endpoints['GET /repos/{owner}/{repo}/issues']['response']['data'];
@@ -12,11 +11,6 @@ type PullsListResponseData =
   Endpoints['GET /repos/{owner}/{repo}/pulls']['response']['data'];
 
 const gitHubLocation = 'https://github.com';
-
-interface Milestone {
-  number: number;
-  title: string;
-}
 
 interface CommentImport {
   created_at?: string;
@@ -34,7 +28,24 @@ interface IssueImport {
   labels?: Array<string>;
 }
 
-export type SimpleLabel = Pick<LabelSchema, 'name' | 'color'>;
+export interface MilestoneImport {
+  id?: number; // GitHub internal identifier
+  iid?: number; // GitLab external number
+  title: string;
+  description: string;
+  state: string;
+  due_date?: string;
+}
+
+export interface SimpleLabel {
+  name: string;
+  color: string;
+}
+
+export interface SimpleMilestone {
+  number: number;
+  title: string;
+}
 
 export class GithubHelper {
   githubApi: GitHubApi;
@@ -100,7 +111,7 @@ export class GithubHelper {
   /**
    * Get a list of all GitHub milestones currently in new repo
    */
-  async getAllGithubMilestones(): Promise<Milestone[]> {
+  async getAllGithubMilestones(): Promise<SimpleMilestone[]> {
     try {
       await utils.sleep(this.delayInMs);
       // get an array of GitHub milestones for the new repo
@@ -708,7 +719,9 @@ export class GithubHelper {
    * @param milestone GitLab milestone data
    * @return Created milestone data (or void if debugging => nothing created)
    */
-  async createMilestone(milestone): Promise<Milestone | void> {
+  async createMilestone(
+    milestone: MilestoneImport
+  ): Promise<SimpleMilestone | void> {
     // convert from GitLab to GitHub
     let githubMilestone: RestEndpointMethodTypes['issues']['createMilestone']['parameters'] =
       {
