@@ -313,12 +313,12 @@ export class GithubHelper {
    * Replaces newlines and tabs with spaces. No attempt is made to remove e.g. Markdown
    * links or other special formatting.
    */
-  async updateRepositoryDescription(description) {
-    let props : RestEndpointMethodTypes["repos"]["update"]["parameters"] = {
+  async updateRepositoryDescription(description: string) {
+    let props: RestEndpointMethodTypes['repos']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      description: description.replace(/\s+/g, " ")
-    }
+      description: description.replace(/\s+/g, ' '),
+    };
     return this.githubApi.repos.update(props);
   }
 
@@ -355,7 +355,7 @@ export class GithubHelper {
   /**
    * Converts GitLab assignees to GitHub usernames, using settings.usermap
    */
-  convertAssignees(item: Partial<GitLabIssue | GitLabMergeRequest>): string[] {
+  convertAssignees(item: GitLabIssue | GitLabMergeRequest): string[] {
     if (!item.assignees) return [];
     let assignees: string[] = [];
     for (let assignee of item.assignees) {
@@ -375,9 +375,7 @@ export class GithubHelper {
    * Note that this requires milestoneMap to be built, either during migration
    * or read from GitHub using registerMilestoneMap()
    */
-  convertMilestone(
-    item: Partial<GitLabIssue | GitLabMergeRequest>
-  ): number | undefined {
+  convertMilestone(item: GitLabIssue | GitLabMergeRequest): number | undefined {
     if (!this.milestoneMap) throw Error('this.milestoneMap not initialised');
     if (!item.milestone) return undefined;
 
@@ -392,7 +390,7 @@ export class GithubHelper {
    *
    * This also adds "has attachment" if the issue links to data.
    */
-  convertLabels(item: Partial<GitLabIssue | GitLabMergeRequest>): string[] {
+  convertLabels(item: GitLabIssue | GitLabMergeRequest): string[] {
     let labels: string[] = [];
     if (item.labels) {
       labels = item.labels.filter(l => {
@@ -1191,7 +1189,7 @@ export class GithubHelper {
       title: string = '',
       repo: string = ''
     ) => {
-      let milestone: Partial<SimpleMilestone> = {};
+      let milestone: SimpleMilestone;
       if (this.milestoneMap) {
         if (number) {
           milestone = this.milestoneMap.get(parseInt(number)) ?? {

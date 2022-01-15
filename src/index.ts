@@ -141,7 +141,7 @@ function createPlaceholderIssue(expectedIdx: number): Partial<GitLabIssue> {
  * This is used for issues where the migration fails. The replacement issue will
  * have the same number and title, but the original description will be lost.
  */
-function createReplacementIssue(issue: Partial<GitLabIssue>) {
+function createReplacementIssue(issue: GitLabIssue) {
   let description = `The original issue\n\n\tId: ${issue.iid}\n\tTitle: ${issue.title}\n\ncould not be created.\nThis is a dummy issue, replacing the original one.`;
 
   if (issue.web_url) {
@@ -217,10 +217,7 @@ async function migrate() {
 async function transferDescription() {
   inform('Transferring Description');
 
-  // Get the description of this project
-  let project = await gitlabApi.Projects.show(
-    settings.gitlab.projectId
-  ) as any;
+  let project = await gitlabApi.Projects.show(settings.gitlab.projectId);
 
   await githubHelper.updateRepositoryDescription(project.description);
 }
