@@ -1,5 +1,10 @@
-import { GithubHelper, MilestoneImport, SimpleLabel } from './githubHelper';
-import { GitlabHelper } from './gitlabHelper';
+import {
+  GithubHelper,
+  MilestoneImport,
+  SimpleLabel,
+  SimpleMilestone,
+} from './githubHelper';
+import { GitlabHelper, GitLabIssue, GitLabMilestone } from './gitlabHelper';
 import settings from '../settings';
 
 import { Octokit as GitHubApi } from '@octokit/rest';
@@ -117,7 +122,7 @@ function createPlaceholderMilestone(expectedIdx: number): MilestoneImport {
  * @param expectedIdx Number of the GitLab issue
  * @returns Data for the issue
  */
-function createPlaceholderIssue(expectedIdx: number) {
+function createPlaceholderIssue(expectedIdx: number): Partial<GitLabIssue> {
   return {
     iid: expectedIdx,
     title: `[PLACEHOLDER] - for issue #${expectedIdx}`,
@@ -130,18 +135,25 @@ function createPlaceholderIssue(expectedIdx: number) {
 
 // ----------------------------------------------------------------------------
 
-/*
- * TODO description
+/**
+ * Creates a so-called "replacement-issue".
+ *
+ * This is used for issues where the migration fails. The replacement issue will
+ * have the same number and title, but the original description will be lost.
  */
-function createReplacementIssue(id: number, title: string, state: string) {
-  const originalGitlabIssueLink = 'TODO'; // TODO
-  const description = `The original issue\n\n\tId: ${id}\n\tTitle: ${title}\n\ncould not be created.\nThis is a dummy issue, replacing the original one. It contains everything but the original issue description. In case the gitlab repository is still existing, visit the following link to show the original issue:\n\n${originalGitlabIssueLink}`;
+function createReplacementIssue(issue: Partial<GitLabIssue>) {
+  let description = `The original issue\n\n\tId: ${issue.iid}\n\tTitle: ${issue.title}\n\ncould not be created.\nThis is a dummy issue, replacing the original one.`;
+
+  if (issue.web_url) {
+    description += `In case the gitlab repository still exists, visit the following link to see the original issue:\n\n${issue.web_url}`;
+  }
 
   return {
-    iid: id,
-    title: `${title} [REPLACEMENT ISSUE]`,
+    iid: issue.iid,
+    title: `${issue.title} [REPLACEMENT ISSUE]`,
     description,
-    state,
+    state: issue.state,
+    created_at: issue.created_at,
   };
 }
 
@@ -198,43 +210,53 @@ async function migrate() {
 /**
  * Transfer any milestones that exist in GitLab that do not exist in GitHub.
  */
-async function transferMilestones(
-  usePlaceholders: boolean
-): Promise<Map<number, number>> {
+async function transferMilestones(usePlaceholders: boolean) {
   inform('Transferring Milestones');
 
   // Get a list of all milestones associated with this project
-  let milestones: MilestoneImport[] = await gitlabApi.ProjectMilestones.all(
-    settings.gitlab.projectId
-  );
+  // FIXME: don't use type join but ensure everything is milestoneImport
+  let milestones: (GitLabMilestone | MilestoneImport)[] =
+    await gitlabApi.ProjectMilestones.all(settings.gitlab.projectId);
 
   // sort milestones in ascending order of when they were created (by id)
   milestones = milestones.sort((a, b) => a.id - b.id);
 
   // get a list of the current milestones in the new GitHub repo (likely to be empty)
   const githubMilestones = await githubHelper.getAllGithubMilestones();
+  let lastMilestoneId = 0;
+  milestones.forEach(milestone => {
+    lastMilestoneId = Math.max(lastMilestoneId, milestone.iid);
+  });
 
-  if (usePlaceholders) {
-    for (let i = 0; i < milestones.length; i++) {
-      // GitLab internal Id (iid)
-      let expectedIdx = i + 1;
+  let milestoneMap = new Map<number, SimpleMilestone>();
+  for (let i = 0; i < milestones.length; i++) {
+    let milestone = milestones[i];
+    let expectedIdx = i + 1; // GitLab internal Id (iid)
 
-      // Create placeholder milestones so that new GitHub milestones will have
-      // the same milestone number as in GitLab. Gaps are caused by deleted
-      // milestones
-      if (milestones[i].iid !== expectedIdx) {
-        milestones.splice(i, 0, createPlaceholderMilestone(expectedIdx));
-        counters.nrOfPlaceholderMilestones++;
-        console.log(
-          `Added placeholder milestone for GitLab milestone %${expectedIdx}.`
-        );
-      }
+    // Create placeholder milestones so that new GitHub milestones will have
+    // the same milestone number as in GitLab. Gaps are caused by deleted
+    // milestones
+    if (usePlaceholders && milestone.iid !== expectedIdx) {
+      let placeholder = createPlaceholderMilestone(expectedIdx);
+      milestones.splice(i, 0, placeholder);
+      counters.nrOfPlaceholderMilestones++;
+      console.log(
+        `Added placeholder milestone for GitLab milestone %${expectedIdx}.`
+      );
+      milestoneMap.set(expectedIdx, {
+        number: expectedIdx,
+        title: placeholder.title,
+      });
+    } else {
+      milestoneMap.set(milestone.iid, {
+        number: expectedIdx,
+        title: milestone.title,
+      });
     }
   }
+  await githubHelper.registerMilestoneMap(milestoneMap);
 
   // if a GitLab milestone does not exist in GitHub repo, create it.
-
-  let milestoneMap = new Map<number, number>();
 
   for (let milestone of milestones) {
     let foundMilestone = githubMilestones.find(
@@ -242,23 +264,24 @@ async function transferMilestones(
     );
     if (!foundMilestone) {
       console.log('Creating: ' + milestone.title);
-      try {
-        // process asynchronous code in sequence
-        let created = await githubHelper.createMilestone(milestone);
-        if (created instanceof Object) {
-          milestoneMap[milestone.iid] = created.number;
-        }
-      } catch (err) {
-        console.error('Could not create milestone', milestone.title);
-        console.error(err);
-      }
+      await githubHelper
+        .createMilestone(milestone)
+        .then(created => {
+          let m = milestoneMap.get(milestone.iid);
+          if (m && m.number != created.number) {
+            throw new Error(
+              `Mismatch between milestone ${m.title} in map and created ${created.title}`
+            );
+          }
+        })
+        .catch(err => {
+          console.error(`Error creating milestone '${milestone.title}'.`);
+          console.error(err);
+        });
     } else {
       console.log('Already exists: ' + milestone.title);
-      milestoneMap[milestone.iid] = foundMilestone.number;
     }
   }
-
-  return milestoneMap;
 }
 
 // ----------------------------------------------------------------------------
@@ -320,15 +343,14 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
 async function transferIssues() {
   inform('Transferring Issues');
 
-  // Because each
-  let milestoneData = await githubHelper.getAllGithubMilestones();
+  await githubHelper.registerMilestoneMap();
 
   // get a list of all GitLab issues associated with this project
   // TODO return all issues via pagination
   let issues = (await gitlabApi.Issues.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  })) as any[];
+  })) as GitLabIssue[];
 
   // sort issues in ascending order of their issue number (by iid)
   issues = issues.sort((a, b) => a.iid - b.iid);
@@ -348,7 +370,7 @@ async function transferIssues() {
       // issue number as in GitLab. If a placeholder is used it is because there
       // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
       if (issues[i].iid !== expectedIdx) {
-        issues.splice(i, 0, createPlaceholderIssue(expectedIdx));
+        issues.splice(i, 0, createPlaceholderIssue(expectedIdx) as GitLabIssue); // HACK: remove type coercion
         counters.nrOfPlaceholderIssues++;
         console.log(
           `Added placeholder issue for GitLab issue #${expectedIdx}.`
@@ -371,7 +393,7 @@ async function transferIssues() {
       console.log(`\nMigrating issue #${issue.iid} ('${issue.title}')...`);
       try {
         // process asynchronous code in sequence -- treats the code sort of like blocking
-        await githubHelper.createIssueAndComments(milestoneData, issue);
+        await githubHelper.createIssueAndComments(issue);
         console.log(`\t...DONE migrating issue #${issue.iid}.`);
       } catch (err) {
         console.log(`\t...ERROR while migrating issue #${issue.iid}.`);
@@ -380,17 +402,11 @@ async function transferIssues() {
 
         if (settings.useReplacementIssuesForCreationFails) {
           console.log('\t-> creating a replacement issue...');
-          const replacementIssue = createReplacementIssue(
-            issue.iid,
-            issue.title,
-            issue.state
-          );
-
+          const replacementIssue = createReplacementIssue(issue);
           try {
             await githubHelper.createIssueAndComments(
-              milestoneData,
-              replacementIssue
-            );
+              replacementIssue as GitLabIssue
+            ); // HACK: remove type coercion
 
             counters.nrOfReplacementIssues++;
             console.error('\t...DONE.');
@@ -436,14 +452,14 @@ async function transferIssues() {
 async function transferMergeRequests() {
   inform('Transferring Merge Requests');
 
-  let milestoneData = await githubHelper.getAllGithubMilestones();
+  await githubHelper.registerMilestoneMap();
 
   // Get a list of all pull requests (merge request equivalent) associated with
   // this project
-  let mergeRequests = (await gitlabApi.MergeRequests.all({
+  let mergeRequests = await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  })) as any;
+  });
 
   // Sort merge requests in ascending order of their number (by iid)
   mergeRequests = mergeRequests.sort((a, b) => a.iid - b.iid);
@@ -466,35 +482,30 @@ async function transferMergeRequests() {
 
   // if a GitLab merge request does not exist in GitHub repo, create it -- along
   // with comments
-  for (let request of mergeRequests) {
+  for (let mr of mergeRequests) {
     // Try to find a GitHub pull request that already exists for this GitLab
     // merge request
     let githubRequest = githubPullRequests.find(
-      i => i.title.trim() === request.title.trim()
+      i => i.title.trim() === mr.title.trim()
     );
     let githubIssue = githubIssues.find(
       // allow for issues titled "Original Issue Name [merged]"
-      i => i.title.trim().includes(request.title.trim())
+      i => i.title.trim().includes(mr.title.trim())
     );
     if (!githubRequest && !githubIssue) {
-      if (settings.skipMergeRequestStates.includes(request.state)) {
+      if (settings.skipMergeRequestStates.includes(mr.state)) {
         console.log(
-          `Skipping MR ${request.iid} in "${request.state}" state: ${request.title}`
+          `Skipping MR ${mr.iid} in "${mr.state}" state: ${mr.title}`
         );
         continue;
       }
-      console.log(
-        'Creating pull request: !' + request.iid + ' - ' + request.title
-      );
+      console.log('Creating pull request: !' + mr.iid + ' - ' + mr.title);
       try {
         // process asynchronous code in sequence
-        await githubHelper.createPullRequestAndComments(milestoneData, request);
+        await githubHelper.createPullRequestAndComments(mr);
       } catch (err) {
         console.error(
-          'Could not create pull request: !' +
-            request.iid +
-            ' - ' +
-            request.title
+          'Could not create pull request: !' + mr.iid + ' - ' + mr.title
         );
         console.error(err);
       }
@@ -502,17 +513,17 @@ async function transferMergeRequests() {
       if (githubRequest) {
         console.log(
           'Gitlab merge request already exists (as github pull request): ' +
-            request.iid +
+            mr.iid +
             ' - ' +
-            request.title
+            mr.title
         );
-        githubHelper.updatePullRequestState(githubRequest, request);
+        githubHelper.updatePullRequestState(githubRequest, mr);
       } else {
         console.log(
           'Gitlab merge request already exists (as github issue): ' +
-            request.iid +
+            mr.iid +
             ' - ' +
-            request.title
+            mr.title
         );
       }
     }

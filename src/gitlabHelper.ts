@@ -1,6 +1,19 @@
 import { Gitlab } from '@gitbeaker/node';
+import {
+  IssueSchema,
+  MergeRequestSchema,
+  MilestoneSchema,
+  NoteSchema,
+  UserSchema,
+} from '@gitbeaker/core/dist/types/types';
 import { GitlabSettings } from './settings';
 import axios from 'axios';
+
+export type GitLabIssue = IssueSchema;
+export type GitLabNote = NoteSchema;
+export type GitLabUser = Omit<UserSchema, 'created_at'>;
+export type GitLabMilestone = MilestoneSchema;
+export type GitLabMergeRequest = MergeRequestSchema;
 
 export class GitlabHelper {
   // Wait for this issue to be resolved
@@ -78,13 +91,13 @@ export class GitlabHelper {
   /**
    * Gets all notes for a given issue.
    */
-  async getIssueNotes(issueIid: number) {
+  async getIssueNotes(issueIid: number): Promise<GitLabNote[]> {
     try {
-      return (await this.gitlabApi.IssueNotes.all(
+      return await this.gitlabApi.IssueNotes.all(
         this.gitlabProjectId,
         issueIid,
         {}
-      )) as any[];
+      );
     } catch (err) {
       console.error(`Could not fetch notes for GitLab issue #${issueIid}.`);
       return [];
@@ -129,13 +142,13 @@ export class GitlabHelper {
   /**
    * Gets all notes for a given merge request.
    */
-  async getAllMergeRequestNotes(pullRequestIid: number) {
+  async getAllMergeRequestNotes(pullRequestIid: number): Promise<GitLabNote[]> {
     try {
       return this.gitlabApi.MergeRequestNotes.all(
         this.gitlabProjectId,
         pullRequestIid,
         {}
-      ) as any as any[];
+      );
     } catch (err) {
       console.error(
         `Could not fetch notes for GitLab merge request #${pullRequestIid}.`
