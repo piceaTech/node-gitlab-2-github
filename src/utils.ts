@@ -36,7 +36,7 @@ export const generateUserProjectRegex = () => {
 export const migrateAttachments = async (
   body: string,
   githubRepoId: number | undefined,
-  s3: S3Settings,
+  s3: S3Settings | undefined,
   gitlabHelper: GitlabHelper
 ) => {
   const regexp = /(!?)\[([^\]]+)\]\((\/uploads[^)]+)\)/g;
@@ -79,7 +79,7 @@ export const migrateAttachments = async (
         const params: S3.PutObjectRequest = {
           Key: relativePath,
           Body: attachmentBuffer,
-          ContentType: mimeType === false ? null : mimeType,
+          ContentType: mimeType === false ? undefined : mimeType,
           Bucket: s3.bucket,
         };
 
@@ -94,14 +94,18 @@ export const migrateAttachments = async (
       });
 
       // Add the new URL to the map
-      offsetToAttachment[match.index] = `${prefix}[${name}](${s3url})`;
+      offsetToAttachment[
+        match.index as number
+      ] = `${prefix}[${name}](${s3url})`;
     } else {
       // Not using S3: default to old URL, adding absolute path
       const host = gitlabHelper.host.endsWith('/')
         ? gitlabHelper.host
         : gitlabHelper.host + '/';
       const attachmentUrl = host + gitlabHelper.projectPath + url;
-      offsetToAttachment[match.index] = `${prefix}[${name}](${attachmentUrl})`;
+      offsetToAttachment[
+        match.index as number
+      ] = `${prefix}[${name}](${attachmentUrl})`;
     }
   }
 

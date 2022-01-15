@@ -25,6 +25,9 @@ export class GitlabHelper {
     this.gitlabToken = gitlabSettings.token;
     this.gitlabProjectId = gitlabSettings.projectId;
     this.host = gitlabSettings.url ? gitlabSettings.url : 'http://gitlab.com';
+    this.host = this.host.endsWith('/')
+      ? this.host.substring(0, this.host.length - 1)
+      : this.host;
     this.sessionCookie = gitlabSettings.sessionCookie;
     this.allBranches = null;
   }
@@ -37,13 +40,13 @@ export class GitlabHelper {
       const projects = await this.gitlabApi.Projects.all({ membership: true });
 
       // print each project with info
-      for (let i = 0; i < projects.length; i++) {
+      for (let project of projects) {
         console.log(
-          projects[i].id.toString(),
+          project.id.toString(),
           '\t',
-          projects[i].name,
+          project.name,
           '\t--\t',
-          projects[i]['description']
+          project['description']
         );
       }
 
@@ -93,8 +96,7 @@ export class GitlabHelper {
    */
   async getAttachment(relurl: string) {
     try {
-      const host = this.host.endsWith('/') ? this.host : this.host + '/';
-      const attachmentUrl = host + this.projectPath + relurl;
+      const attachmentUrl = this.host + '/' + this.projectPath + relurl;
       const data = (
         await axios.get(attachmentUrl, {
           responseType: 'arraybuffer',

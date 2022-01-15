@@ -20,12 +20,12 @@ interface CommentImport {
 interface IssueImport {
   title: string;
   body: string;
-  created_at: string;
   closed: boolean;
   assignee?: string;
+  created_at?: string;
   updated_at?: string;
   milestone?: number;
-  labels?: Array<string>;
+  labels?: string[];
 }
 
 export interface MilestoneImport {
@@ -200,7 +200,7 @@ export class GithubHelper {
    * @param tag {string} - the tag name to search a release for
    * @returns
    */
-  async getReleaseByTag(tag) {
+  async getReleaseByTag(tag: string) {
     try {
       await utils.sleep(this.delayInMs);
       // get an existing release by tag name in github
@@ -604,9 +604,7 @@ export class GithubHelper {
     let nrOfMigratedNotes = 0;
     for (let note of notes) {
       const gotMigrated = await this.processNote(note, githubIssue);
-      if (gotMigrated) {
-        nrOfMigratedNotes++;
-      }
+      if (gotMigrated) nrOfMigratedNotes++;
     }
 
     console.log(
@@ -625,7 +623,7 @@ export class GithubHelper {
    * Note that this is case insensitive!
    *
    */
-  checkIfNoteCanBeSkipped(noteBody) {
+  checkIfNoteCanBeSkipped(noteBody: string) {
     const stateChange =
       (/Status changed to .*/i.test(noteBody) &&
         !/Status changed to closed by commit.*/i.test(noteBody)) ||
@@ -734,7 +732,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve();
+    if (settings.debug) return Promise.resolve({ number: -1, title: 'DEBUG' });
 
     const created = await this.githubApi.issues.createMilestone(
       githubMilestone
@@ -754,7 +752,7 @@ export class GithubHelper {
       owner: this.githubOwner,
       repo: this.githubRepo,
       name: label.name,
-      color: label.color.substr(1), // remove leading "#" because gitlab returns it but github wants the color without it
+      color: label.color.substring(1), // remove leading "#" because gitlab returns it but github wants the color without it
     };
 
     await utils.sleep(this.delayInMs);
@@ -1249,7 +1247,7 @@ export class GithubHelper {
    * When migrating in-line comments to GitHub then creates a link to the
    * appropriate line of the diff.
    */
-  static createLineRef(position, repoLink) {
+  static createLineRef(position, repoLink: string): string {
     if (
       !repoLink ||
       !repoLink.startsWith(gitHubLocation) ||

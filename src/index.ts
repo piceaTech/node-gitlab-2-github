@@ -102,6 +102,7 @@ if (!settings.gitlab.projectId) {
  */
 function createPlaceholderMilestone(expectedIdx: number): MilestoneImport {
   return {
+    id: -1, // dummy
     iid: expectedIdx,
     title: `[PLACEHOLDER] - for milestone #${expectedIdx}`,
     description:
@@ -155,35 +156,30 @@ async function migrate() {
   //
 
   try {
-    let milestoneMap: Map<number, number>;
-
     await githubHelper.registerRepoId();
     await gitlabHelper.registerProjectPath(settings.gitlab.projectId);
 
-    // transfer GitLab milestones to GitHub
     if (settings.transfer.milestones) {
-      milestoneMap = await transferMilestones(
+      await transferMilestones(
         settings.usePlaceholderMilestonesForMissingMilestones
       );
     }
 
-    // transfer GitLab labels to GitHub
     if (settings.transfer.labels) {
       await transferLabels(true, settings.conversion.useLowerCaseLabels);
     }
 
-    // transfer GitLab releases to GitHub
     if (settings.transfer.releases) {
       await transferReleases();
     }
 
-    // Transfer issues with their comments; do this before transferring the merge requests
+    // Important: do this before transferring the merge requests
     if (settings.transfer.issues) {
       await transferIssues();
     }
+
     if (settings.transfer.mergeRequests) {
       if (settings.mergeRequests.log) {
-        // log merge requests
         await logMergeRequests(settings.mergeRequests.logFile);
       } else {
         await transferMergeRequests();
@@ -299,9 +295,7 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   // if a GitLab label does not exist in GitHub repo, create it.
   for (let label of labels) {
     // GitHub prefers lowercase label names
-    if (useLowerCase) {
-      label.name = label.name.toLowerCase();
-    }
+    if (useLowerCase) label.name = label.name.toLowerCase();
 
     if (!githubLabels.find(l => l === label.name)) {
       console.log('Creating: ' + label.name);
@@ -536,9 +530,7 @@ async function transferReleases() {
   inform('Transferring Releases');
 
   // Get a list of all releases associated with this project
-  let releases = (await gitlabApi.Releases.all(
-    settings.gitlab.projectId
-  )) as any;
+  let releases = await gitlabApi.Releases.all(settings.gitlab.projectId);
 
   // Sort releases in ascending order of their release date
   releases = releases.sort((a, b) => {
@@ -593,44 +585,40 @@ async function transferReleases() {
 /**
  * logs merge requests that exist in GitLab to a file.
  */
-async function logMergeRequests(logFile) {
+async function logMergeRequests(logFile: string) {
   inform('Logging Merge Requests');
 
   // get a list of all GitLab merge requests associated with this project
   // TODO return all MRs via pagination
-  let mergeRequests = (await gitlabApi.MergeRequests.all({
+  let mergeRequests = await gitlabApi.MergeRequests.all({
     projectId: settings.gitlab.projectId,
     labels: settings.filterByLabel,
-  })) as any;
+  });
 
   // sort MRs in ascending order of when they were created (by id)
   mergeRequests = mergeRequests.sort((a, b) => a.id - b.id);
 
   console.log('Logging ' + mergeRequests.length.toString() + ' merge requests');
 
-  for (let mergeRequest of mergeRequests) {
+  for (let mr of mergeRequests) {
     let mergeRequestDiscussions = await gitlabApi.MergeRequestDiscussions.all(
       settings.gitlab.projectId,
-      mergeRequest.iid
+      mr.iid
     );
     let mergeRequestNotes = await gitlabApi.MergeRequestNotes.all(
       settings.gitlab.projectId,
-      mergeRequest.iid,
+      mr.iid,
       {}
     );
 
-    mergeRequest.discussions = mergeRequestDiscussions
-      ? mergeRequestDiscussions
-      : [];
-    mergeRequest.notes = mergeRequestNotes ? mergeRequestNotes : [];
+    mr.discussions = mergeRequestDiscussions ? mergeRequestDiscussions : [];
+    mr.notes = mergeRequestNotes ? mergeRequestNotes : [];
   }
 
   //
   // Log the merge requests to a file
   //
-  const output = {
-    mergeRequests: mergeRequests,
-  };
+  const output = { mergeRequests: mergeRequests };
 
   fs.writeFileSync(logFile, JSON.stringify(output, null, 2));
 }
@@ -640,7 +628,7 @@ async function logMergeRequests(logFile) {
 /**
  * Print out a section heading to let the user know what is happening
  */
-function inform(msg) {
+function inform(msg: string) {
   console.log('==================================');
   console.log(msg);
   console.log('==================================');

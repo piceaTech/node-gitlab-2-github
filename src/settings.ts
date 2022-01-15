@@ -23,7 +23,7 @@ export default interface Settings {
   usePlaceholderIssuesForMissingIssues: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;
-  filterByLabel: string | null;
+  filterByLabel?: string;
   skipMergeRequestStates: string[];
   skipMatchingComments: string[];
   mergeRequests: {
