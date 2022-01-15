@@ -1,4 +1,3 @@
-import settings from '../settings';
 import { S3Settings } from './settings';
 import * as mime from 'mime-types';
 import * as path from 'path';
@@ -8,28 +7,6 @@ import { GitlabHelper } from './gitlabHelper';
 
 export const sleep = (milliseconds: number) => {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
-};
-
-/**
- * Generate regular expression which finds userid and cross-project issue references
- * from usermap and projectmap
- */
-export const generateUserProjectRegex = () => {
-  let reString = '';
-  if (settings.usermap !== null && Object.keys(settings.usermap).length > 0) {
-    reString = '@' + Object.keys(settings.usermap).join('|@');
-  }
-  if (
-    settings.projectmap !== null &&
-    Object.keys(settings.projectmap).length > 0
-  ) {
-    if (reString.length > 0) {
-      reString += '|';
-    }
-    reString += Object.keys(settings.projectmap).join('#|') + '#';
-  }
-
-  return new RegExp(reString, 'g');
 };
 
 // Creates new attachments and replaces old links

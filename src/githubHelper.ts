@@ -64,7 +64,6 @@ export class GithubHelper {
   githubRepo: string;
   githubTimeout?: number;
   gitlabHelper: GitlabHelper;
-  userProjectRegex: RegExp;
   repoId?: number;
   delayInMs: number;
   useIssuesForAllMergeRequests: boolean;
@@ -85,8 +84,6 @@ export class GithubHelper {
     this.githubRepo = githubSettings.repo;
     this.githubTimeout = githubSettings.timeout;
     this.gitlabHelper = gitlabHelper;
-    // regex for converting user from GitLab to GitHub
-    this.userProjectRegex = utils.generateUserProjectRegex();
     this.delayInMs = 2000;
     this.useIssuesForAllMergeRequests = useIssuesForAllMergeRequests;
   }
@@ -1097,67 +1094,188 @@ export class GithubHelper {
 
   // TODO fix unexpected type coercion risk
   /**
-   * Converts issue body and issue comments from GitLab to GitHub. That means:
-   * - (optionally) add a line at the beginning indicating which original user
-   *   created the issue or the comment and when - because the GitHub API creates
-   *   everything as the API user (use useIssueImportAPI: true in settings to use
-   *   the issue import preview API instead which allows setting the date)
-   * - Change username from GitLab to GitHub in "mentions" (@username)
+   * Converts issue body or issue comments from GitLab to GitHub. That means:
+   * - (optionally) Adds a line at the beginning indicating which original user created the
+   *   issue or the comment and when - because the GitHub API creates everything
+   *   as the API user
+   * - Changes username from GitLab to GitHub in "mentions" (@username)
+   * - Changes milestone references to links
+   * - Changes MR references to PR references, taking into account the changes
+   *   in indexing due to GitHub PRs using following the same numbering as
+   *   issues
+   * - Changes issue numbers (necessary e.g. if dummy GH issues were not
+   *   created for deleted GL issues).
+   *
+   * FIXME: conversion should be deactivated depending on the context in the
+   *  markdown, e.g. strike-through text for labels, or code blocks for all
+   *  references.
+   *
    * @param str Body of the GitLab note
-   * @param item GitLab note
+   * @param item GitLab item to which the note belongs
    * @param add_line Set to true to add the line with author and creation date
    */
-
   async convertIssuesAndComments(
     str: string,
-    item: any,
+    item: GitLabIssue | GitLabMergeRequest | GitLabNote | MilestoneImport,
     add_line: boolean = true
-  ) {
-    const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
-    if (
-      (!settings.usermap || Object.keys(settings.usermap).length === 0) &&
-      (!settings.projectmap || Object.keys(settings.projectmap).length === 0)
-    ) {
-      return add_line
-        ? GithubHelper.addMigrationLine(str, item, repoLink)
-        : str;
-    } else {
-      // - Replace userids as defined in settings.usermap.
-      //   They all start with '@' in the issues but we have them without in usermap
-      // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
-      //   They all have a '#' right after the project name in the issues but we have them without in projectmap
-      let strWithMigLine = add_line
-        ? GithubHelper.addMigrationLine(str, item, repoLink)
-        : str;
+  ): Promise<string> {
+    // A note on implementation:
+    // We don't convert project names once at the beginning because otherwise
+    // we would have to check whether "text#23" refers to issue 23 or not, and
+    // so on for MRs, milestones, etc.
+    // Instead we consider either project#issue or " #issue" with non-word char
+    // before the #, and we do the same for MRs, labels and milestones.
 
-      strWithMigLine = strWithMigLine.replace(
-        this.userProjectRegex,
-        matched => {
-          if (matched.startsWith('@')) {
-            // this is a userid
-            return '@' + settings.usermap[matched.substr(1)];
-          } else if (matched.endsWith('#')) {
-            // this is a cross-project issue reference
-            return (
-              settings.projectmap[matched.substring(0, matched.length - 1)] +
-              '#'
-            );
-          } else {
-            // something went wrong, do nothing
-            return matched;
+    const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
+    const hasUsermap =
+      settings.usermap !== null && Object.keys(settings.usermap).length > 0;
+    const hasProjectmap =
+      settings.projectmap !== null &&
+      Object.keys(settings.projectmap).length > 0;
+
+    if (add_line) str = GithubHelper.addMigrationLine(str, item, repoLink);
+    let reString = '';
+
+    //
+    // User name conversion
+    //
+
+    if (hasUsermap) {
+      reString = '@' + Object.keys(settings.usermap).join('|@');
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        match => '@' + settings.usermap[match.substring(1)]
+      );
+    }
+
+    //
+    // Issue reference conversion
+    //
+
+    let issueReplacer = (match: string) => {
+      // TODO: issueMap
+      return '#' + match;
+    };
+
+    if (hasProjectmap) {
+      reString =
+        '(' + Object.keys(settings.projectmap).join(')#(\\d+)|(') + ')#(\\d+)';
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        (_, p1, p2) => settings.projectmap[p1] + '#' + issueReplacer(p2)
+      );
+    }
+    reString = '(?<=\\W)#(\\d+)';
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) => issueReplacer(p1));
+
+    //
+    // Milestone reference replacement
+    //
+
+    let milestoneReplacer = (
+      number: string = '',
+      title: string = '',
+      repo: string = ''
+    ) => {
+      let milestone: Partial<SimpleMilestone> = {};
+      if (this.milestoneMap) {
+        if (number) {
+          milestone = this.milestoneMap.get(parseInt(number)) ?? {
+            number: parseInt(number),
+            title: `GitHub milestone ${number} not in map`,
+          };
+        } else if (title) {
+          for (let m of this.milestoneMap.values()) {
+            if (m.title === title) {
+              milestone = m;
+              break;
+            }
           }
         }
+      }
+      if (milestone) {
+        const repoLink = `${this.githubUrl}/${this.githubOwner}/${
+          repo || this.githubRepo
+        }`;
+        return `[${milestone.title}](${repoLink}/milestone/${milestone.number})`;
+      }
+      console.log(
+        `\tERROR: Milestone ${number}, "${title}" not found among migrated milestones.`
+      );
+      return number || title || 'No milestone'; // milestone numbers are always > 0
+    };
+
+    if (hasProjectmap) {
+      // Replace: project%"Milestone"
+      reString =
+        '(' +
+        Object.keys(settings.projectmap).join(')%(".*?")|(') +
+        ')%(".*?")';
+      str = str.replace(new RegExp(reString, 'g'), (_, p1, p2) =>
+        milestoneReplacer('', p2, settings.projectmap[p1])
       );
 
-      strWithMigLine = await utils.migrateAttachments(
-        strWithMigLine,
-        this.repoId,
-        settings.s3,
-        this.gitlabHelper
+      // Replace: project%nn
+      reString =
+        '(' + Object.keys(settings.projectmap).join(')%(\\d+)|(') + ')%(\\d+)';
+      str = str.replace(new RegExp(reString, 'g'), (_, p1, p2) =>
+        milestoneReplacer(p2, '', settings.projectmap[p1])
       );
-
-      return strWithMigLine;
     }
+    // Replace: %"Milestone"
+    reString = '(?<=\\W)%"(.*?)"';
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
+      milestoneReplacer('', p1)
+    );
+
+    // Replace: %nn
+    reString = '(?<=\\W)%(\\d+)';
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
+      milestoneReplacer(p1, '')
+    );
+
+    //
+    // Label reference conversion
+    //
+
+    // FIXME: strike through in markdown is done as in: ~this text~
+    // These regexes will capture ~this as a label. If it is among the migrated
+    // labels, then it will be linked.
+
+    let labelReplacer = (label: string) => {};
+
+    // // Single word named label
+    // if (hasProjectmap) {
+    //   const reChunk = '~([^~\\s\\.,;:\'"!@()\\\\\\[\\]])+(?=[^~\\w])';
+    //   reString =
+    //     '('
+    //     + Object.keys(settings.projectmap).join(')' + reChunk + '|(')
+    //     + ')'
+    //     + reChunk;
+    //   str = str.replace(new RegExp(reString, 'g'),
+    //   (_, p1, p2) => )
+
+    //   TODO
+    // } else {
+    //   ...
+    // }
+
+    // // Quoted named label
+    // reString = '~"([^~"]|\\w)+"(?=[^~\\w])';
+
+    //
+    // MR reference conversion
+    //
+    // TODO
+
+    str = await utils.migrateAttachments(
+      str,
+      this.repoId,
+      settings.s3,
+      this.gitlabHelper
+    );
+
+    return str;
   }
 
   // ----------------------------------------------------------------------------
