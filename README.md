@@ -64,7 +64,11 @@ GitLab's API [does not allow downloading of attachments](https://gitlab.com/gitl
 
 #### github.baseUrl
 
-Where is the github instance hosted? Default is the official `api.github.com` domain
+Where is the github instance hosted? The default is the official `github.com` domain
+
+#### github.apiUrl
+
+Point this to the api. The default is `api.github.com`.
 
 #### github.owner
 

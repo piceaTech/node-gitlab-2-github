@@ -35,6 +35,7 @@ export default interface Settings {
 
 export interface GithubSettings {
   baseUrl?: string;
+  apiUrl?: string;
   owner: string;
   token: string;
   token_owner: string;

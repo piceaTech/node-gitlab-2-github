@@ -48,8 +48,8 @@ const MyOctokit = GitHubApi.plugin(throttling);
 const githubApi = new MyOctokit({
   previews: settings.useIssueImportAPI ? ['golden-comet'] : [],
   debug: false,
-  baseUrl: settings.github.baseUrl
-    ? settings.github.baseUrl
+  baseUrl: settings.github.apiUrl
+    ? settings.github.apiUrl
     : 'https://api.github.com',
   timeout: 5000,
   headers: {
