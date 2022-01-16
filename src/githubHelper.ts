@@ -1192,10 +1192,7 @@ export class GithubHelper {
       let milestone: SimpleMilestone;
       if (this.milestoneMap) {
         if (number) {
-          milestone = this.milestoneMap.get(parseInt(number)) ?? {
-            number: parseInt(number),
-            title: `GitHub milestone ${number} not in map`,
-          };
+          milestone = this.milestoneMap.get(parseInt(number));
         } else if (title) {
           for (let m of this.milestoneMap.values()) {
             if (m.title === title) {
@@ -1214,7 +1211,7 @@ export class GithubHelper {
       console.log(
         `\tERROR: Milestone ${number}, "${title}" not found among migrated milestones.`
       );
-      return number || title || 'No milestone'; // milestone numbers are always > 0
+      return `'Reference to deleted milestone ${number || title}'`;
     };
 
     if (hasProjectmap) {
