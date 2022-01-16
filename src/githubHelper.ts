@@ -1282,6 +1282,7 @@ export class GithubHelper {
       console.log(`Creating repo ${params.owner}/${params.repo}...`);
       await this.githubApi.repos.createForAuthenticatedUser({
         name: this.githubRepo,
+        private: true,
       });
       console.log('\t...done.');
     } catch (err) {

@@ -84,7 +84,7 @@ What is the name of the new repo
 
 #### github.recreateRepo
 
-If true (default is false), we will try to delete the destination github repository if present, and (re)create it. The github token must be granted `delete_repo` scope.
+If true (default is false), we will try to delete the destination github repository if present, and (re)create it. The github token must be granted `delete_repo` scope. The newly created repository will be made private by default.
 
 This is useful when debugging this tool or a specific migration. You will always be prompted for confirmation.
 
