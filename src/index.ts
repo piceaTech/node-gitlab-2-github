@@ -6,6 +6,7 @@ import { Octokit as GitHubApi } from '@octokit/rest';
 import { throttling } from '@octokit/plugin-throttling';
 import { Gitlab } from '@gitbeaker/node';
 
+import { default as readlineSync } from 'readline-sync';
 import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
@@ -101,10 +102,24 @@ if (!settings.gitlab.projectId) {
   gitlabHelper.listProjects();
 } else {
   // user has chosen a project
+  if (settings.github.recreateRepo === true) {
+    recreate();
+  }
   migrate();
 }
 
 // ----------------------------------------------------------------------------
+
+async function recreate() {
+  readlineSync.setDefaultOptions({
+    limit: ['no', 'yes'],
+    limitMessage: 'Please enter yes or no',
+    defaultInput: 'no',
+  });
+  const ans = readlineSync.question('Delete and recreate? [yes/no] ');
+  if (ans == 'yes') await githubHelper.recreateRepo();
+  else console.log("OK, I won't delete anything then.");
+}
 
 /*
  * TODO description

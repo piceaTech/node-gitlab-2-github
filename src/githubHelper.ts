@@ -1260,4 +1260,29 @@ export class GithubHelper {
     const ref = path && line ? `${path} line ${line}` : `${head_sha}`;
     return `Commented on [${ref}](${repoLink}/compare/${base_sha}..${head_sha}${slug})\n\n`;
   }
+
+  async recreateRepo() {
+    let params = {
+      owner: this.githubOwner,
+      repo: this.githubRepo,
+    };
+
+    try {
+      process.stdout.write(`Deleting repo ${params.owner}/${params.repo}...`);
+      await this.githubApi.repos.delete(params);
+      process.stdout.write(' done.');
+    } catch (err) {
+      if (err.status == 404) process.stdout.write(' not found.');
+      else console.error(`\n\tSomething went wrong: ${err}.`);
+    }
+    try {
+      process.stdout.write(`Creating repo ${params.owner}/${params.repo}...`);
+      await this.githubApi.repos.createForAuthenticatedUser({
+        name: this.githubRepo,
+      });
+      process.stdout.write(' done.');
+    } catch (err) {
+      console.error(`\n\tSomething went wrong: ${err}.`);
+    }
+  }
 }

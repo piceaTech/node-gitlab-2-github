@@ -19,7 +19,8 @@
         "src/index.ts"
       ],
       "protocol": "inspector",
-      "sourceMaps": true
+      "sourceMaps": true,
+      "console": "integratedTerminal"
     }
   ]
 }
