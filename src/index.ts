@@ -110,6 +110,9 @@ if (!settings.gitlab.projectId) {
 
 // ----------------------------------------------------------------------------
 
+/**
+ * Asks for confirmation and maybe recreates the GitHub repository.
+ */
 async function recreate() {
   readlineSync.setDefaultOptions({
     limit: ['no', 'yes'],

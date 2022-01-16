@@ -1262,7 +1262,7 @@ export class GithubHelper {
   }
 
   /**
-   * Asks for confirmation and then maybe deletes the GH repository, then creates it again.
+   * Deletes the GH repository, then creates it again.
    */
   async recreateRepo() {
     let params = {
