@@ -1271,19 +1271,19 @@ export class GithubHelper {
     };
 
     try {
-      process.stdout.write(`Deleting repo ${params.owner}/${params.repo}...`);
+      console.log(`Deleting repo ${params.owner}/${params.repo}...`);
       await this.githubApi.repos.delete(params);
-      process.stdout.write(' done.');
+      console.log('\t...done.');
     } catch (err) {
-      if (err.status == 404) process.stdout.write(' not found.');
+      if (err.status == 404) console.log(' not found.');
       else console.error(`\n\tSomething went wrong: ${err}.`);
     }
     try {
-      process.stdout.write(`Creating repo ${params.owner}/${params.repo}...`);
+      console.log(`Creating repo ${params.owner}/${params.repo}...`);
       await this.githubApi.repos.createForAuthenticatedUser({
         name: this.githubRepo,
       });
-      process.stdout.write(' done.');
+      console.log('\t...done.');
     } catch (err) {
       console.error(`\n\tSomething went wrong: ${err}.`);
     }
