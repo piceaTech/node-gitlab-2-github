@@ -1288,5 +1288,6 @@ export class GithubHelper {
     } catch (err) {
       console.error(`\n\tSomething went wrong: ${err}.`);
     }
+    await utils.sleep(this.delayInMs);
   }
 }
