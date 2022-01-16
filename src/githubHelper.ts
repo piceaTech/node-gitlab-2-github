@@ -1209,7 +1209,7 @@ export class GithubHelper {
         return `[${milestone.title}](${repoLink}/milestone/${milestone.number})`;
       }
       console.log(
-        `\tERROR: Milestone ${number}, "${title}" not found among migrated milestones.`
+        `\tMilestone '${number || title}' not found in milestone map.`
       );
       return `'Reference to deleted milestone ${number || title}'`;
     };
@@ -1220,15 +1220,18 @@ export class GithubHelper {
         '(' +
         Object.keys(settings.projectmap).join(')%(".*?")|(') +
         ')%(".*?")';
-      str = str.replace(new RegExp(reString, 'g'), (_, p1, p2) =>
-        milestoneReplacer('', p2, settings.projectmap[p1])
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        (_, p1, p2) => `Milestone ${p2} in ${settings.projectmap[p1]}`
       );
 
       // Replace: project%nn
       reString =
         '(' + Object.keys(settings.projectmap).join(')%(\\d+)|(') + ')%(\\d+)';
-      str = str.replace(new RegExp(reString, 'g'), (_, p1, p2) =>
-        milestoneReplacer(p2, '', settings.projectmap[p1])
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        (_, p1, p2) =>
+          `[Milestone ${p2} in ${settings.projectmap[p1]}](${this.githubUrl}/${this.githubOwner}/${settings.projectmap[p1]})`
       );
     }
     // Replace: %"Milestone"
