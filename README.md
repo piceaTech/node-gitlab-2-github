@@ -84,7 +84,9 @@ What is the name of the new repo
 
 #### github.recreateRepo
 
-If true (default is false), we will try to delete the destination github repository if present, and (re)create it. This is useful when debugging this tool or a specific migration. You will always be prompted for confirmation.
+If true (default is false), we will try to delete the destination github repository if present, and (re)create it. The github token must be granted `delete_repo` scope.
+
+This is useful when debugging this tool or a specific migration. You will always be prompted for confirmation.
 
 ### s3 (optional)
 
