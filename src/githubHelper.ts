@@ -1261,6 +1261,9 @@ export class GithubHelper {
     return `Commented on [${ref}](${repoLink}/compare/${base_sha}..${head_sha}${slug})\n\n`;
   }
 
+  /**
+   * Asks for confirmation and then maybe deletes the GH repository, then creates it again.
+   */
   async recreateRepo() {
     let params = {
       owner: this.githubOwner,
