@@ -41,6 +41,7 @@ export interface GithubSettings {
   repo: string;
   timeout?: number;
   username?: string; // when is this set???
+  recreateRepo?: boolean;
 }
 
 export interface GitlabSettings {

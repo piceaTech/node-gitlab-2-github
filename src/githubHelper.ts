@@ -1260,4 +1260,34 @@ export class GithubHelper {
     const ref = path && line ? `${path} line ${line}` : `${head_sha}`;
     return `Commented on [${ref}](${repoLink}/compare/${base_sha}..${head_sha}${slug})\n\n`;
   }
+
+  /**
+   * Deletes the GH repository, then creates it again.
+   */
+  async recreateRepo() {
+    let params = {
+      owner: this.githubOwner,
+      repo: this.githubRepo,
+    };
+
+    try {
+      console.log(`Deleting repo ${params.owner}/${params.repo}...`);
+      await this.githubApi.repos.delete(params);
+      console.log('\t...done.');
+    } catch (err) {
+      if (err.status == 404) console.log(' not found.');
+      else console.error(`\n\tSomething went wrong: ${err}.`);
+    }
+    try {
+      console.log(`Creating repo ${params.owner}/${params.repo}...`);
+      await this.githubApi.repos.createForAuthenticatedUser({
+        name: this.githubRepo,
+        private: true,
+      });
+      console.log('\t...done.');
+    } catch (err) {
+      console.error(`\n\tSomething went wrong: ${err}.`);
+    }
+    await utils.sleep(this.delayInMs);
+  }
 }
