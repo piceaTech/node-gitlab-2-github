@@ -14,6 +14,7 @@ export default {
     token: '{{token}}',
     token_owner: '{{token_owner}}',
     repo: '{{repo}}',
+    recreateRepo: false,
   },
   s3: {
     accessKeyId: '{{accessKeyId}}',
