@@ -287,7 +287,7 @@ async function transferMilestones(usePlaceholders: boolean) {
           let m = milestoneMap.get(milestone.iid);
           if (m && m.number != created.number) {
             throw new Error(
-              `Mismatch between milestone ${m.title} in map and created ${created.title}`
+              `Mismatch between milestone ${m.number}: '${m.title}' in map and created ${created.number}: '${created.title}'`
             );
           }
         })
