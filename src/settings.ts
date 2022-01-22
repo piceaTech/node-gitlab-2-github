@@ -20,10 +20,11 @@ export default interface Settings {
     releases: boolean;
   };
   useIssueImportAPI: boolean;
+  usePlaceholderMilestonesForMissingMilestones: boolean;
   usePlaceholderIssuesForMissingIssues: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;
-  filterByLabel: string | null;
+  filterByLabel?: string;
   skipMergeRequestStates: string[];
   skipMatchingComments: string[];
   mergeRequests: {
@@ -35,6 +36,7 @@ export default interface Settings {
 
 export interface GithubSettings {
   baseUrl?: string;
+  apiUrl?: string;
   owner: string;
   token: string;
   token_owner: string;

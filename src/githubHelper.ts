@@ -3,33 +3,58 @@ import { GithubSettings } from './settings';
 import * as utils from './utils';
 import { Octokit as GitHubApi, RestEndpointMethodTypes } from '@octokit/rest';
 import { Endpoints } from '@octokit/types';
-import GitlabHelper from './gitlabHelper';
-import { LabelSchema } from '@gitbeaker/core/dist/types/types';
+import {
+  GitlabHelper,
+  GitLabIssue,
+  GitLabMergeRequest,
+  GitLabNote,
+  GitLabUser,
+} from './gitlabHelper';
 
 type IssuesListForRepoResponseData =
   Endpoints['GET /repos/{owner}/{repo}/issues']['response']['data'];
 type PullsListResponseData =
   Endpoints['GET /repos/{owner}/{repo}/pulls']['response']['data'];
 
+type GitHubIssue = IssuesListForRepoResponseData[0];
+type GitHubPullRequest = PullsListResponseData[0];
+
 const gitHubLocation = 'https://github.com';
 
 interface CommentImport {
   created_at?: string;
-  body: string
-};
+  body: string;
+}
 
 interface IssueImport {
   title: string;
   body: string;
-  created_at: string;
   closed: boolean;
   assignee?: string;
+  created_at?: string;
   updated_at?: string;
   milestone?: number;
-  labels?: Array<string>;
+  labels?: string[];
 }
 
-export type SimpleLabel = Pick<LabelSchema, 'name' | 'color'>;
+export interface MilestoneImport {
+  id: number; // GitHub internal identifier
+  iid: number; // GitLab external number
+  title: string;
+  description: string;
+  state: string;
+  due_date?: string;
+}
+
+export interface SimpleLabel {
+  name: string;
+  color: string;
+}
+
+export interface SimpleMilestone {
+  number: number;
+  title: string;
+}
 
 export class GithubHelper {
   githubApi: GitHubApi;
@@ -39,10 +64,10 @@ export class GithubHelper {
   githubRepo: string;
   githubTimeout?: number;
   gitlabHelper: GitlabHelper;
-  userProjectRegex: RegExp;
   repoId?: number;
   delayInMs: number;
   useIssuesForAllMergeRequests: boolean;
+  milestoneMap?: Map<number, SimpleMilestone>;
 
   constructor(
     githubApi: GitHubApi,
@@ -59,8 +84,6 @@ export class GithubHelper {
     this.githubRepo = githubSettings.repo;
     this.githubTimeout = githubSettings.timeout;
     this.gitlabHelper = gitlabHelper;
-    // regex for converting user from GitLab to GitHub
-    this.userProjectRegex = utils.generateUserProjectRegex();
     this.delayInMs = 2000;
     this.useIssuesForAllMergeRequests = useIssuesForAllMergeRequests;
   }
@@ -77,7 +100,6 @@ export class GithubHelper {
   async registerRepoId() {
     try {
       await utils.sleep(this.delayInMs);
-      // get an array of GitHub milestones for the new repo
       let result = await this.githubApi.repos.get({
         owner: this.githubOwner,
         repo: this.githubRepo,
@@ -96,7 +118,7 @@ export class GithubHelper {
   /**
    * Get a list of all GitHub milestones currently in new repo
    */
-  async getAllGithubMilestones() {
+  async getAllGithubMilestones(): Promise<SimpleMilestone[]> {
     try {
       await utils.sleep(this.delayInMs);
       // get an array of GitHub milestones for the new repo
@@ -106,13 +128,7 @@ export class GithubHelper {
         state: 'all',
       });
 
-      // extract the milestone number and title and put into a new array
-      const milestones = result.data.map(x => ({
-        number: x.number,
-        title: x.title,
-      }));
-
-      return milestones;
+      return result.data.map(x => ({ number: x.number, title: x.title }));
     } catch (err) {
       console.error('Could not access all GitHub milestones');
       console.error(err);
@@ -186,20 +202,19 @@ export class GithubHelper {
 
   // ----------------------------------------------------------------------------
 
-  
   /**
    * Gets a release by tag name
    * @param tag {string} - the tag name to search a release for
-   * @returns 
+   * @returns
    */
-   async getReleaseByTag(tag) {
+  async getReleaseByTag(tag: string) {
     try {
       await utils.sleep(this.delayInMs);
       // get an existing release by tag name in github
       let result = await this.githubApi.repos.getReleaseByTag({
         owner: this.githubOwner,
         repo: this.githubRepo,
-        tag: tag
+        tag: tag,
       });
 
       return result;
@@ -217,10 +232,7 @@ export class GithubHelper {
    * @param name {string} - title of the release
    * @param body {string} - description for the release
    */
-   async createRelease(
-    tag_name: string, 
-    name: string,
-    body: string) {
+  async createRelease(tag_name: string, name: string, body: string) {
     try {
       await utils.sleep(this.delayInMs);
       // get an array of GitHub labels for the new repo
@@ -286,10 +298,14 @@ export class GithubHelper {
    ******************************** POST METHODS ********************************
    ******************************************************************************
    */
-   userIsCreator(author) {
-    return author && 
-      ((settings.usermap && settings.usermap[author.username] === settings.github.token_owner) ||
-       (author.username === settings.github.token_owner));
+  userIsCreator(author: GitLabUser) {
+    return (
+      author &&
+      ((settings.usermap &&
+        settings.usermap[author.username as string] ===
+          settings.github.token_owner) ||
+        author.username === settings.github.token_owner)
+    );
   }
 
   /**
@@ -297,12 +313,12 @@ export class GithubHelper {
    * Replaces newlines and tabs with spaces. No attempt is made to remove e.g. Markdown
    * links or other special formatting.
    */
-  async updateRepositoryDescription(description) {
-    let props : RestEndpointMethodTypes["repos"]["update"]["parameters"] = {
+  async updateRepositoryDescription(description: string) {
+    let props: RestEndpointMethodTypes['repos']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      description: description.replace(/\s+/g, " ")
-    }
+      description: description.replace(/\s+/g, ' '),
+    };
     return this.githubApi.repos.update(props);
   }
 
@@ -311,170 +327,136 @@ export class GithubHelper {
    * @param milestones All GitHub milestones
    * @param issue The GitLab issue object
    */
-  async createIssue(milestones, issue) {
+  async createIssue(issue: GitLabIssue) {
     let bodyConverted = await this.convertIssuesAndComments(
-      issue.description,
-      issue
+      issue.description ?? '',
+      issue,
+      !this.userIsCreator(issue.author) || !issue.description
     );
 
     let props: RestEndpointMethodTypes['issues']['create']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      title: issue.title.trim(),
+      title: issue.title ? issue.title.trim() : '',
       body: bodyConverted,
     };
 
-    //
-    // Issue Assignee
-    //
+    props.assignees = this.convertAssignees(issue);
+    props.milestone = this.convertMilestone(issue);
+    props.labels = this.convertLabels(issue);
 
-    // If the GitLab issue has an assignee, make sure to carry it over -- but only
-    // if the username is a valid GitHub username.
-    if (issue.assignee) {
-      props.assignees = [];
-      if (issue.assignee.username === settings.github.username) {
-        props.assignees.push(settings.github.username);
-      } else if (
-        settings.usermap &&
-        settings.usermap[issue.assignee.username]
-      ) {
-        // get GitHub username name from settings
-        props.assignees.push(settings.usermap[issue.assignee.username]);
+    await utils.sleep(this.delayInMs);
+
+    if (settings.debug) return Promise.resolve({ data: issue });
+
+    return this.githubApi.issues.create(props);
+  }
+
+  /**
+   * Converts GitLab assignees to GitHub usernames, using settings.usermap
+   */
+  convertAssignees(item: GitLabIssue | GitLabMergeRequest): string[] {
+    if (!item.assignees) return [];
+    let assignees: string[] = [];
+    for (let assignee of item.assignees) {
+      let username: string = assignee.username as string;
+      if (username === settings.github.username) {
+        assignees.push(settings.github.username);
+      } else if (settings.usermap && settings.usermap[username]) {
+        assignees.push(settings.usermap[username]);
       }
     }
+    return assignees;
+  }
 
-    //
-    // Issue Milestone
-    //
+  /**
+   * Returns the GitHub milestone id for a milestone GitLab property of an issue or MR
+   *
+   * Note that this requires milestoneMap to be built, either during migration
+   * or read from GitHub using registerMilestoneMap()
+   */
+  convertMilestone(item: GitLabIssue | GitLabMergeRequest): number | undefined {
+    if (!this.milestoneMap) throw Error('this.milestoneMap not initialised');
+    if (!item.milestone) return undefined;
 
-    // if the GitLab issue has an associated milestone, make sure to attach it.
-    if (issue.milestone) {
-      let milestone = milestones.find(m => m.title === issue.milestone.title);
-      if (milestone) {
-        props.milestone = milestone.number;
-      }
-    }
+    for (let m of this.milestoneMap.values())
+      if (m.title == item.milestone.title) return m.number;
 
-    //
-    // Issue Labels
-    //
+    return undefined;
+  }
 
-    // make sure to add any labels that existed in GitLab
-    if (issue.labels) {
-      props.labels = issue.labels.filter(l => {
-        if (issue.state !== 'closed') return true;
+  /**
+   * Converts GitLab labels to GitHub labels.
+   *
+   * This also adds "has attachment" if the issue links to data.
+   */
+  convertLabels(item: GitLabIssue | GitLabMergeRequest): string[] {
+    let labels: string[] = [];
+    if (item.labels) {
+      labels = item.labels.filter(l => {
+        if (item.state !== 'closed') return true;
 
         let lower = l.toLowerCase();
         // ignore any labels that should have been removed when the issue was closed
         return lower !== 'doing' && lower !== 'to do';
       });
       if (settings.conversion.useLowerCaseLabels) {
-        props.labels = props.labels.map((el : string) => el.toLowerCase());
+        labels = labels.map((el: string) => el.toLowerCase());
       }
     }
 
-    //
-    // Issue Attachments
-    //
-
-    // if the issue contains a url that contains "/uploads/", it is likely to
-    // have an attachment. Therefore, add the "has attachment" label.
-    if (props.body && props.body.indexOf('/uploads/') > -1 && !settings.s3) {
-      props.labels.push('has attachment');
+    // If the item's description contains a url that contains "/uploads/",
+    // it is likely to have an attachment
+    if (
+      item.description &&
+      item.description.indexOf('/uploads/') > -1 &&
+      !settings.s3
+    ) {
+      labels.push('has attachment');
     }
-    await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve({ data: issue });
-    // create the GitHub issue from the GitLab issue
-    return this.githubApi.issues.create(props);
+    return labels;
   }
 
-  /** 
+  /**
    * Uses the preview issue import API to set creation date on issues and comments.
    * Also it does not notify assignees.
-   * 
+   *
    * See https://gist.github.com/jonmagic/5282384165e0f86ef105
    * @param milestones All GitHub milestones
    * @param issue The GitLab issue object
    */
-  async importIssueAndComments(milestones, issue) {
+  async importIssueAndComments(issue: GitLabIssue) {
+    let bodyConverted = issue.isPlaceholder
+      ? issue.description ?? ''
+      : await this.convertIssuesAndComments(
+          issue.description ?? '',
+          issue,
+          !this.userIsCreator(issue.author) || !issue.description
+        );
 
-    let props : IssueImport = {
-      title: issue.title.trim(),
-      body: await this.convertIssuesAndComments(
-        issue.description, issue, !this.userIsCreator(issue.author) || !issue.description),
+    let props: IssueImport = {
+      title: issue.title ? issue.title.trim() : '',
+      body: bodyConverted,
       created_at: issue.created_at,
       updated_at: issue.updated_at,
-      closed: issue.state === 'closed'
+      closed: issue.state === 'closed',
     };
 
-    let comments : Array<CommentImport>;
+    let assignees = this.convertAssignees(issue);
+    props.assignee = assignees.length == 1 ? assignees[0] : undefined;
+    props.milestone = this.convertMilestone(issue);
+    props.labels = this.convertLabels(issue);
 
-    //
-    // Issue Assignee
-    //
-
-    // If the GitLab issue has an assignee, make sure to carry it over -- but only
-    // if the username is a valid GitHub username.
-    if (issue.assignee) {
-      if (issue.assignee.username === settings.github.username) {
-        props.assignee = settings.github.username;
-      } else if (settings.usermap && settings.usermap[issue.assignee.username] ) {
-        props.assignee = settings.usermap[issue.assignee.username];
-      } else if (issue.assignee.username === settings.github.token_owner) {
-        props.assignee = settings.github.token_owner;
-      }
-    }
-
-    //
-    // Issue Milestone
-    //
-
-    // if the GitLab issue has an associated milestone, make sure to attach it.
-    if (issue.milestone) {
-      let milestone = milestones.find(m => m.title === issue.milestone.title);
-      if (milestone) {
-        props.milestone = milestone.number;
-      }
-    }
-
-    //
-    // Issue Labels
-    //
-
-    // make sure to add any labels that existed in GitLab
-    if (issue.labels) {
-      props.labels = issue.labels.filter(l => {
-        if (issue.state !== 'closed') return true;
-
-        let lower = l.toLowerCase();
-        // ignore any labels that should have been removed when the issue was closed
-        return lower !== 'doing' && lower !== 'to do';
-      });
-      if (settings.conversion.useLowerCaseLabels) {
-        props.labels = props.labels.map((el : string) => el.toLowerCase());
-      }
-    }
-
-    //
-    // Issue Attachments
-    //
-
-    // if the issue contains a url that contains "/uploads/", it is likely to
-    // have an attachment. Therefore, add the "has attachment" label.
-    if (props.body && props.body.indexOf('/uploads/') > -1 && !settings.s3) {
-      props.labels.push('has attachment');
-    }
-
-    // Is this OK? It will just return the argument
     if (settings.debug) return Promise.resolve({ data: issue });
-
 
     //
     // Issue comments
     //
 
     console.log('\tMigrating issue comments...');
+
+    let comments: CommentImport[] = [];
 
     if (issue.isPlaceholder) {
       console.log(
@@ -485,77 +467,111 @@ export class GithubHelper {
       comments = await this.processNotesIntoComments(notes);
     }
 
-    return this.requestImportIssue(props, comments);
+    const issue_number = await this.requestImportIssue(props, comments);
+
+    if (assignees.length > 1 && issue_number) {
+      if (assignees.length > 10) {
+        console.error(
+          `Cannot add more than 10 assignees to GitHub issue #${issue_number}.`
+        );
+      } else {
+        console.log(
+          `Importing ${assignees.length} assignees for GitHub issue #${issue_number}`
+        );
+      }
+      this.githubApi.issues.addAssignees({
+        owner: this.githubOwner,
+        repo: this.githubRepo,
+        issue_number: issue_number,
+        assignees: assignees,
+      });
+    }
   }
 
   /**
-   * 
-   * @param notes 
+   *
+   * @param notes
    * @returns Comments ready for requestImportIssue()
    */
-  async processNotesIntoComments(notes) {
-    let comments : Array<CommentImport> = [];
-
-    // sort notes in ascending order of when they were created (by id)
-    notes = notes.sort((a, b) => a.id - b.id);
-
-    if (notes.length === 0) {
+  async processNotesIntoComments(
+    notes: GitLabNote[]
+  ): Promise<CommentImport[]> {
+    if (!notes || !notes.length) {
       console.log(`\t...no comments available, nothing to migrate.`);
       return [];
     }
 
+    let comments: CommentImport[] = [];
+
+    // sort notes in ascending order of when they were created (by id)
+    notes = notes.sort((a, b) => a.id - b.id);
+
     let nrOfMigratedNotes = 0;
     for (let note of notes) {
-      if (this.checkIfNoteCanBeSkipped(note.body)) {
-        continue;
-      }
+      if (this.checkIfNoteCanBeSkipped(note.body)) continue;
 
-      let userIsPoster = (settings.usermap && 
-          settings.usermap[note.author.username] === settings.github.token_owner) ||
-          note.author.username === settings.github.token_owner;
+      let userIsPoster =
+        (settings.usermap &&
+          settings.usermap[note.author.username] ===
+            settings.github.token_owner) ||
+        note.author.username === settings.github.token_owner;
 
       comments.push({
         created_at: note.created_at,
         body: await this.convertIssuesAndComments(
-          note.body, note, !userIsPoster || !note.body)
+          note.body,
+          note,
+          !userIsPoster || !note.body
+        ),
       });
 
       nrOfMigratedNotes++;
     }
+
     console.log(
-      `\t...Done creating comments (migrated ${nrOfMigratedNotes} comments, skipped ${notes.length - nrOfMigratedNotes} comments)`
+      `\t...Done creating comments (migrated ${nrOfMigratedNotes} comments, skipped ${
+        notes.length - nrOfMigratedNotes
+      } comments)`
     );
     return comments;
   }
   /**
    * Calls the preview API for issue importing
-   * 
+   *
    * @param issue Props for the issue
    * @param comments Comments
    * @returns GitHub issue number or null if import failed
    */
-  async requestImportIssue(issue : IssueImport, comments : Array<CommentImport>) {
+  async requestImportIssue(
+    issue: IssueImport,
+    comments: CommentImport[]
+  ): Promise<number | null> {
     // create the GitHub issue from the GitLab issue
     let pending = await this.githubApi.request(
-        `POST /repos/${settings.github.owner}/${settings.github.repo}/import/issues`, 
-        {
-          "issue": issue,
-          "comments": comments
-        });
+      `POST /repos/${settings.github.owner}/${settings.github.repo}/import/issues`,
+      {
+        issue: issue,
+        comments: comments,
+      }
+    );
 
     let result = null;
     while (true) {
       await utils.sleep(this.delayInMs);
       result = await this.githubApi.request(
-        `GET /repos/${settings.github.owner}/${settings.github.repo}/import/issues/${pending.data.id}`);
-      if (result.data.status === "imported" || result.data.status === "failed") {
+        `GET /repos/${settings.github.owner}/${settings.github.repo}/import/issues/${pending.data.id}`
+      );
+      if (
+        result.data.status === 'imported' ||
+        result.data.status === 'failed'
+      ) {
         break;
       }
     }
-    if (result.data.status === "failed") {
-      console.log("\tFAILED: ");
+    if (result.data.status === 'failed') {
+      console.log('\tFAILED: ');
       console.log(result);
-      console.log("\tERRORS:")
+      console.log('\tERRORS:');
       console.log(result.data.errors);
       return null;
     }
@@ -569,7 +585,7 @@ export class GithubHelper {
   /**
    * TODO description
    */
-  async createIssueComments(githubIssue, issue) {
+  async createIssueComments(githubIssue: GitHubIssue, issue: GitLabIssue) {
     console.log('\tMigrating issue comments...');
 
     // retrieve any notes/comments associated with this issue
@@ -594,9 +610,7 @@ export class GithubHelper {
     let nrOfMigratedNotes = 0;
     for (let note of notes) {
       const gotMigrated = await this.processNote(note, githubIssue);
-      if (gotMigrated) {
-        nrOfMigratedNotes++;
-      }
+      if (gotMigrated) nrOfMigratedNotes++;
     }
 
     console.log(
@@ -615,7 +629,7 @@ export class GithubHelper {
    * Note that this is case insensitive!
    *
    */
-  checkIfNoteCanBeSkipped(noteBody) {
+  checkIfNoteCanBeSkipped(noteBody: string) {
     const stateChange =
       (/Status changed to .*/i.test(noteBody) &&
         !/Status changed to closed by commit.*/i.test(noteBody)) ||
@@ -627,7 +641,7 @@ export class GithubHelper {
       /^removed ~.* label/i.test(noteBody) ||
       /^mentioned in issue #\d+.*/i.test(noteBody) ||
       // /^marked this issue as related to #\d+/i.test(noteBody) ||
-      /^mentioned in merge request !\d+/i.test(noteBody) ||    
+      /^mentioned in merge request !\d+/i.test(noteBody) ||
       /^changed the description.*/i.test(noteBody) ||
       /^changed title from.*to.*/i.test(noteBody);
 
@@ -646,33 +660,31 @@ export class GithubHelper {
    * This means, it either creates a comment in the github issue, or it gets skipped.
    * Return false when it got skipped, otherwise true.
    */
-  async processNote(note, githubIssue) {
-    if (this.checkIfNoteCanBeSkipped(note.body)) {
-      // note will be skipped
-      return false;
-    } else {
-      let bodyConverted = await this.convertIssuesAndComments(note.body, note);
+  async processNote(
+    note: GitLabNote,
+    githubIssue: Pick<GitHubIssue | GitHubPullRequest, 'number'>
+  ) {
+    if (this.checkIfNoteCanBeSkipped(note.body)) return false;
 
-      await utils.sleep(this.delayInMs);
+    let bodyConverted = await this.convertIssuesAndComments(note.body, note);
 
-      if (settings.debug) {
-        return true;
-      }
+    await utils.sleep(this.delayInMs);
 
-      await this.githubApi.issues
-        .createComment({
-          owner: this.githubOwner,
-          repo: this.githubRepo,
-          issue_number: githubIssue.number,
-          body: bodyConverted,
-        })
-        .catch(x => {
-          console.error('could not create GitHub issue comment!');
-          console.error(x);
-          process.exit(1);
-        });
-      return true;
-    }
+    if (settings.debug) return true;
+
+    await this.githubApi.issues
+      .createComment({
+        owner: this.githubOwner,
+        repo: this.githubRepo,
+        issue_number: githubIssue.number,
+        body: bodyConverted,
+      })
+      .catch(x => {
+        console.error('could not create GitHub issue comment!');
+        console.error(x);
+        process.exit(1);
+      });
+    return true;
   }
 
   // ----------------------------------------------------------------------------
@@ -680,7 +692,7 @@ export class GithubHelper {
   /**
    * Update the issue state (i.e., closed or open).
    */
-  async updateIssueState(githubIssue, issue) {
+  async updateIssueState(githubIssue: GitHubIssue, issue: GitLabIssue) {
     // default state is open so we don't have to update if the issue is closed.
     if (issue.state !== 'closed' || githubIssue.state === 'closed') return;
 
@@ -693,10 +705,8 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) {
-      return Promise.resolve();
-    }
-    // make the state update
+    if (settings.debug) return Promise.resolve();
+
     return await this.githubApi.issues.update(props);
   }
 
@@ -704,15 +714,23 @@ export class GithubHelper {
 
   /**
    * Create a GitHub milestone from a GitLab milestone
+   * @param milestone GitLab milestone data
+   * @return Created milestone data (or void if debugging => nothing created)
    */
-  async createMilestone(milestone) {
+  async createMilestone(milestone: MilestoneImport): Promise<SimpleMilestone> {
     // convert from GitLab to GitHub
+    let bodyConverted = await this.convertIssuesAndComments(
+      milestone.description,
+      milestone,
+      false
+    );
+
     let githubMilestone: RestEndpointMethodTypes['issues']['createMilestone']['parameters'] =
       {
         owner: this.githubOwner,
         repo: this.githubRepo,
         title: milestone.title,
-        description: milestone.description,
+        description: bodyConverted,
         state: milestone.state === 'active' ? 'open' : 'closed',
       };
 
@@ -722,9 +740,13 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve();
-    // create the GitHub milestone
-    return await this.githubApi.issues.createMilestone(githubMilestone);
+    if (settings.debug) return Promise.resolve({ number: -1, title: 'DEBUG' });
+
+    const created = await this.githubApi.issues.createMilestone(
+      githubMilestone
+    );
+
+    return { number: created.data.number, title: created.data.title };
   }
 
   // ----------------------------------------------------------------------------
@@ -738,7 +760,7 @@ export class GithubHelper {
       owner: this.githubOwner,
       repo: this.githubRepo,
       name: label.name,
-      color: label.color.substr(1), // remove leading "#" because gitlab returns it but github wants the color without it
+      color: label.color.substring(1), // remove leading "#" because gitlab returns it but github wants the color without it
     };
 
     await utils.sleep(this.delayInMs);
@@ -752,35 +774,30 @@ export class GithubHelper {
 
   /**
    * Create a pull request, set its data, and set its comments
-   * @param milestones a list of the milestones that exist in the GitHub repository
-   * @param pullRequest the GitLab pull request that we want to migrate
-   * @returns {Promise<void>}
+   * @param mergeRequest the GitLab merge request that we want to migrate
    */
-  async createPullRequestAndComments(milestones, pullRequest) {
-    let githubPullRequestData = await this.createPullRequest(pullRequest);
-    
+  async createPullRequestAndComments(
+    mergeRequest: GitLabMergeRequest
+  ): Promise<void> {
+    let pullRequestData = await this.createPullRequest(mergeRequest);
+
     // createPullRequest() returns an issue number if a PR could not be created and
     // an issue was created instead, and settings.useIssueImportAPI is true. In that
     // case comments were already added and the state is already properly set
-    if (typeof githubPullRequestData === 'number')
-      return;
+    if (typeof pullRequestData === 'number' || !pullRequestData) return;
 
-    let githubPullRequest = githubPullRequestData.data;
+    let pullRequest = pullRequestData.data;
 
     // data is set to null if one of the branches does not exist and the pull request cannot be created
-    if (githubPullRequest) {
+    if (pullRequest) {
       // Add milestones, labels, and other attributes from the Issues API
-      await this.updatePullRequestData(
-        githubPullRequest,
-        pullRequest,
-        milestones
-      );
+      await this.updatePullRequestData(pullRequest, mergeRequest);
 
       // add any comments/nodes associated with this pull request
-      await this.createPullRequestComments(githubPullRequest, pullRequest);
+      await this.createPullRequestComments(pullRequest, mergeRequest);
 
       // Make sure to close the GitHub pull request if it is closed or merged in GitLab
-      await this.updatePullRequestState(githubPullRequest, pullRequest);
+      await this.updatePullRequestState(pullRequest, mergeRequest);
     }
   }
 
@@ -790,10 +807,10 @@ export class GithubHelper {
    * Create a pull request. A pull request can only be created if both the target and source branches exist on the GitHub
    * repository. In many cases, the source branch is deleted when the merge occurs, and the merge request may not be able
    * to be migrated. In this case, an issue is created instead with a 'gitlab merge request' label.
-   * @param pullRequest the GitLab pull request object that we want to duplicate
+   * @param mergeRequest the GitLab merge request object that we want to duplicate
    * @returns {Promise<Promise<{data: null}>|Promise<Github.Response<Github.PullsCreateResponse>>|Promise<{data: *}>>}
    */
-  async createPullRequest(pullRequest) {
+  async createPullRequest(mergeRequest: GitLabMergeRequest) {
     let canCreate = !this.useIssuesForAllMergeRequests;
 
     if (canCreate) {
@@ -802,19 +819,19 @@ export class GithubHelper {
         await this.githubApi.repos.getBranch({
           owner: this.githubOwner,
           repo: this.githubRepo,
-          branch: pullRequest.target_branch,
+          branch: mergeRequest.target_branch,
         });
       } catch (err) {
         let gitlabBranches = await this.gitlabHelper.getAllBranches();
-        if (gitlabBranches.find(m => m.name === pullRequest.target_branch)) {
+        if (gitlabBranches.find(m => m.name === mergeRequest.target_branch)) {
           // Need to move that branch over to GitHub!
           console.error(
-            `The '${pullRequest.target_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${pullRequest.iid}.`
+            `The '${mergeRequest.target_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${mergeRequest.iid}.`
           );
           return Promise.resolve({ data: null });
         } else {
           console.error(
-            `Merge request ${pullRequest.iid} (target branch '${pullRequest.target_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
+            `Merge request ${mergeRequest.iid} (target branch '${mergeRequest.target_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
           );
           canCreate = false;
         }
@@ -827,41 +844,41 @@ export class GithubHelper {
         await this.githubApi.repos.getBranch({
           owner: this.githubOwner,
           repo: this.githubRepo,
-          branch: pullRequest.source_branch,
+          branch: mergeRequest.source_branch,
         });
       } catch (err) {
         let gitlabBranches = await this.gitlabHelper.getAllBranches();
-        if (gitlabBranches.find(m => m.name === pullRequest.source_branch)) {
+        if (gitlabBranches.find(m => m.name === mergeRequest.source_branch)) {
           // Need to move that branch over to GitHub!
           console.error(
-            `The '${pullRequest.source_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${pullRequest.iid}.`
+            `The '${mergeRequest.source_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${mergeRequest.iid}.`
           );
           return Promise.resolve({ data: null });
         } else {
           console.error(
-            `Pull request #${pullRequest.iid} (source branch '${pullRequest.source_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
+            `Pull request #${mergeRequest.iid} (source branch '${mergeRequest.source_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
           );
           canCreate = false;
         }
       }
     }
 
-    if (settings.debug) return Promise.resolve({ data: pullRequest });
+    if (settings.debug) return Promise.resolve({ data: mergeRequest });
 
     if (canCreate) {
       let bodyConverted = await this.convertIssuesAndComments(
-        pullRequest.description,
-        pullRequest
+        mergeRequest.description,
+        mergeRequest
       );
 
       // GitHub API Documentation to create a pull request: https://developer.github.com/v3/pulls/#create-a-pull-request
       let props = {
         owner: this.githubOwner,
         repo: this.githubRepo,
-        title: pullRequest.title.trim(),
+        title: mergeRequest.title.trim(),
         body: bodyConverted,
-        head: pullRequest.source_branch,
-        base: pullRequest.target_branch,
+        head: mergeRequest.source_branch,
+        base: mergeRequest.target_branch,
       };
 
       await utils.sleep(this.delayInMs);
@@ -873,7 +890,7 @@ export class GithubHelper {
       } catch (err) {
         if (err.status === 422) {
           console.error(
-            `Pull request #${pullRequest.iid} - attempt to create has failed, assume '${pullRequest.source_branch}' has already been merged => cannot migrate pull request, creating an issue instead.`
+            `Pull request #${mergeRequest.iid} - attempt to create has failed, assume '${mergeRequest.source_branch}' has already been merged => cannot migrate pull request, creating an issue instead.`
           );
           // fall through to next section
         } else {
@@ -884,63 +901,59 @@ export class GithubHelper {
 
     // Failing all else, create an issue with a descriptive title
 
-    
     let mergeStr =
       '_Merges ' +
-      pullRequest.source_branch +
+      mergeRequest.source_branch +
       ' -> ' +
-      pullRequest.target_branch +
+      mergeRequest.target_branch +
       '_\n\n';
     let bodyConverted = await this.convertIssuesAndComments(
-      mergeStr + pullRequest.description,
-      pullRequest,
-      !this.userIsCreator(pullRequest.author) || !settings.useIssueImportAPI
+      mergeStr + mergeRequest.description,
+      mergeRequest,
+      !this.userIsCreator(mergeRequest.author) || !settings.useIssueImportAPI
     );
 
-    if (settings.useIssueImportAPI) {          
-      let props : IssueImport = {
-        title: pullRequest.title.trim() + ' - [' + pullRequest.state + ']',
+    if (settings.useIssueImportAPI) {
+      let assignees = this.convertAssignees(mergeRequest);
+
+      let props: IssueImport = {
+        title: mergeRequest.title.trim() + ' - [' + mergeRequest.state + ']',
         body: bodyConverted,
-        created_at: pullRequest.created_at,
-        updated_at: pullRequest.updated_at,
-        closed: pullRequest.state === 'merged' || pullRequest.state === 'closed',
-        labels: ['gitlab merge request']
+        assignee: assignees.length > 0 ? assignees[0] : undefined,
+        created_at: mergeRequest.created_at,
+        updated_at: mergeRequest.updated_at,
+        closed:
+          mergeRequest.state === 'merged' || mergeRequest.state === 'closed',
+        labels: ['gitlab merge request'],
       };
 
-      if (pullRequest.assignee) {
-        if (pullRequest.assignee.username === settings.github.username) {
-          props.assignee = settings.github.username;
-        } else if (settings.usermap && settings.usermap[pullRequest.assignee.username] ) {
-          props.assignee = settings.usermap[pullRequest.assignee.username];
-        } else if (pullRequest.assignee.username === settings.github.token_owner) {
-          props.assignee = settings.github.token_owner;
-        }
-      }
-
       console.log('\tMigrating pull request comments...');
-      let comments : Array<CommentImport> = [];
+      let comments: CommentImport[] = [];
 
-      if (!pullRequest.iid) {
+      if (!mergeRequest.iid) {
         console.log(
           '\t...this is a placeholder for a deleted GitLab merge request, no comments are created.'
         );
       } else {
-        let notes = await this.gitlabHelper.getAllMergeRequestNotes(pullRequest.iid);
-        comments = await this.processNotesIntoComments(notes);  
+        let notes = await this.gitlabHelper.getAllMergeRequestNotes(
+          mergeRequest.iid
+        );
+        comments = await this.processNotesIntoComments(notes);
       }
 
       return this.requestImportIssue(props, comments);
-
     } else {
       let props = {
         owner: this.githubOwner,
         repo: this.githubRepo,
-        title: pullRequest.title.trim() + ' - [' + pullRequest.state + ']',
+        assignees: this.convertAssignees(mergeRequest),
+        title: mergeRequest.title.trim() + ' - [' + mergeRequest.state + ']',
         body: bodyConverted,
       };
 
       // Add a label to indicate the issue is a merge request
-      pullRequest.labels.push('gitlab merge request');
+      if (!mergeRequest.labels) mergeRequest.labels = [];
+      mergeRequest.labels.push('gitlab merge request');
 
       return this.githubApi.issues.create(props);
     }
@@ -950,14 +963,16 @@ export class GithubHelper {
 
   /**
    * Create comments for the pull request
-   * @param githubPullRequest the GitHub pull request object
-   * @param pullRequest the GitLab pull request object
-   * @returns {Promise<void>}
+   * @param pullRequest the GitHub pull request object
+   * @param mergeRequest the GitLab merge request object
    */
-  async createPullRequestComments(githubPullRequest, pullRequest) {
+  async createPullRequestComments(
+    pullRequest: Pick<GitHubPullRequest, 'number'>,
+    mergeRequest: GitLabMergeRequest
+  ): Promise<void> {
     console.log('\tMigrating pull request comments...');
 
-    if (!pullRequest.iid) {
+    if (!mergeRequest.iid) {
       console.log(
         '\t...this is a placeholder for a deleted GitLab merge request, no comments are created.'
       );
@@ -965,7 +980,7 @@ export class GithubHelper {
     }
 
     let notes = await this.gitlabHelper.getAllMergeRequestNotes(
-      pullRequest.iid
+      mergeRequest.iid
     );
 
     // if there are no notes, then there is nothing to do!
@@ -981,10 +996,8 @@ export class GithubHelper {
 
     let nrOfMigratedNotes = 0;
     for (let note of notes) {
-      const gotMigrated = await this.processNote(note, githubPullRequest);
-      if (gotMigrated) {
-        nrOfMigratedNotes++;
-      }
+      const gotMigrated = await this.processNote(note, pullRequest);
+      if (gotMigrated) nrOfMigratedNotes++;
     }
 
     console.log(
@@ -999,65 +1012,23 @@ export class GithubHelper {
   /**
    * Update the pull request data. The GitHub Pull Request API does not supply mechanisms to set the milestone, assignee,
    * or labels; these data are set via the Issues API in this function
-   * @param githubPullRequest the GitHub pull request object
-   * @param pullRequest the GitLab pull request object
-   * @param milestones a list of Milestones that exist in the GitHub repo
+   * @param pullRequest the GitHub pull request object
+   * @param mergeRequest the GitLab pull request object
    * @returns {Promise<Github.Response<Github.IssuesUpdateResponse>>}
    */
-  async updatePullRequestData(githubPullRequest, pullRequest, milestones) {
+  async updatePullRequestData(
+    pullRequest: Pick<GitHubPullRequest, 'number'>,
+    mergeRequest: GitLabMergeRequest
+  ) {
     let props: RestEndpointMethodTypes['issues']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      issue_number: githubPullRequest.number || githubPullRequest.iid,
+      issue_number: pullRequest.number,
     };
 
-    //
-    // Pull Request Assignee
-    //
-
-    // If the GitLab merge request has an assignee, make sure to carry it over --
-    // but only if the username is a valid GitHub username
-    if (pullRequest.assignee) {
-      props.assignees = [];
-      if (pullRequest.assignee.username === settings.github.username) {
-        props.assignees.push(settings.github.username);
-      } else if (
-        settings.usermap &&
-        settings.usermap[pullRequest.assignee.username]
-      ) {
-        // Get GitHub username from settings
-        props.assignees.push(settings.usermap[pullRequest.assignee.username]);
-      }
-    }
-
-    //
-    // Pull Request Milestone
-    //
-
-    // if the GitLab merge request has an associated milestone, make sure to attach it
-    if (pullRequest.milestone) {
-      let milestone = milestones.find(
-        m => m.title === pullRequest.milestone.title
-      );
-      if (milestone) {
-        props.milestone = milestone.number;
-      }
-    }
-
-    //
-    // Merge Request Labels
-    //
-
-    // make sure to add any labels that existed in GitLab
-    if (pullRequest.labels) {
-      props.labels = pullRequest.labels.filter(l => {
-        if (pullRequest.state !== 'closed') return true;
-
-        let lower = l.toLowerCase();
-        // ignore any labels that should have been removed when the issue was closed
-        return lower !== 'doing' && lower !== 'to do';
-      });
-    }
+    props.assignees = this.convertAssignees(mergeRequest);
+    props.milestone = this.convertMilestone(mergeRequest);
+    props.labels = this.convertLabels(mergeRequest);
 
     return await this.githubApi.issues.update(props);
   }
@@ -1066,29 +1037,32 @@ export class GithubHelper {
 
   /**
    * Update the pull request state
-   * @param githubPullRequest GitHub pull request object
-   * @param pullRequest GitLab pull request object
+   * @param pullRequest GitHub pull request object
+   * @param mergeRequest GitLab pull request object
    * @returns {Promise<Promise<Github.AnyResponse>|Github.Response<Github.PullsUpdateResponse>|Promise<void>>}
    */
-  async updatePullRequestState(githubPullRequest, pullRequest) {
+  async updatePullRequestState(
+    pullRequest: Pick<GitHubPullRequest, 'number' | 'state'>,
+    mergeRequest: GitLabMergeRequest
+  ) {
     if (
-      pullRequest.state === 'merged' &&
-      githubPullRequest.state !== 'closed' &&
+      mergeRequest.state === 'merged' &&
+      pullRequest.state !== 'closed' &&
       !settings.debug
     ) {
       // Merging the pull request adds new commits to the tree; to avoid that, just close the merge requests
-      pullRequest.state = 'closed';
+      mergeRequest.state = 'closed';
     }
 
     // Default state is open so we don't have to update if the request is closed
-    if (pullRequest.state !== 'closed' || githubPullRequest.state === 'closed')
+    if (mergeRequest.state !== 'closed' || pullRequest.state === 'closed')
       return;
 
     let props: RestEndpointMethodTypes['issues']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      issue_number: githubPullRequest.number,
-      state: pullRequest.state,
+      issue_number: pullRequest.number,
+      state: mergeRequest.state,
     };
 
     await utils.sleep(this.delayInMs);
@@ -1109,16 +1083,22 @@ export class GithubHelper {
    * @param milestones GitHub milestones
    * @param issue GitLab issue
    */
-  async createIssueAndComments(milestones, issue) {
+  async createIssueAndComments(issue: GitLabIssue) {
     if (settings.useIssueImportAPI) {
-      await this.importIssueAndComments(milestones, issue);
+      await this.importIssueAndComments(issue);
     } else {
-      const githubIssueData = await this.createIssue(milestones, issue);
+      const githubIssueData = await this.createIssue(issue);
       const githubIssue = githubIssueData.data;
       // add any comments/notes associated with this issue
-      await this.createIssueComments(githubIssue, issue);
+      await this.createIssueComments(
+        githubIssue as GitHubIssue,
+        issue as GitLabIssue
+      );
       // make sure to close the GitHub issue if it is closed in GitLab
-      await this.updateIssueState(githubIssue, issue);
+      await this.updateIssueState(
+        githubIssue as GitHubIssue,
+        issue as GitLabIssue
+      );
     }
   }
 
@@ -1126,63 +1106,188 @@ export class GithubHelper {
 
   // TODO fix unexpected type coercion risk
   /**
-   * Converts issue body and issue comments from GitLab to GitHub. That means:
-   * - (optionally) add a line at the beginning indicating which original user 
-   *   created the issue or the comment and when - because the GitHub API creates
-   *   everything as the API user (use useIssueImportAPI: true in settings to use
-   *   the issue import preview API instead which allows setting the date)
-   * - Change username from GitLab to GitHub in "mentions" (@username)
+   * Converts issue body or issue comments from GitLab to GitHub. That means:
+   * - (optionally) Adds a line at the beginning indicating which original user created the
+   *   issue or the comment and when - because the GitHub API creates everything
+   *   as the API user
+   * - Changes username from GitLab to GitHub in "mentions" (@username)
+   * - Changes milestone references to links
+   * - Changes MR references to PR references, taking into account the changes
+   *   in indexing due to GitHub PRs using following the same numbering as
+   *   issues
+   * - Changes issue numbers (necessary e.g. if dummy GH issues were not
+   *   created for deleted GL issues).
+   *
+   * FIXME: conversion should be deactivated depending on the context in the
+   *  markdown, e.g. strike-through text for labels, or code blocks for all
+   *  references.
+   *
    * @param str Body of the GitLab note
-   * @param item GitLab note
+   * @param item GitLab item to which the note belongs
    * @param add_line Set to true to add the line with author and creation date
    */
+  async convertIssuesAndComments(
+    str: string,
+    item: GitLabIssue | GitLabMergeRequest | GitLabNote | MilestoneImport,
+    add_line: boolean = true
+  ): Promise<string> {
+    // A note on implementation:
+    // We don't convert project names once at the beginning because otherwise
+    // we would have to check whether "text#23" refers to issue 23 or not, and
+    // so on for MRs, milestones, etc.
+    // Instead we consider either project#issue or " #issue" with non-word char
+    // before the #, and we do the same for MRs, labels and milestones.
 
-  async convertIssuesAndComments(str: string, item: any, add_line: boolean = true) {
     const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
-    if (
-      (!settings.usermap || Object.keys(settings.usermap).length === 0) &&
-      (!settings.projectmap || Object.keys(settings.projectmap).length === 0)
-    ) {
-      return add_line
-          ? GithubHelper.addMigrationLine(str, item, repoLink) 
-          : str;
-    } else {
-      // - Replace userids as defined in settings.usermap.
-      //   They all start with '@' in the issues but we have them without in usermap
-      // - Replace cross-project issue references. They are matched on org/project# so 'matched' ends with '#'
-      //   They all have a '#' right after the project name in the issues but we have them without in projectmap
-      let strWithMigLine = add_line
-          ? GithubHelper.addMigrationLine(str, item, repoLink) 
-          : str;
+    const hasUsermap =
+      settings.usermap !== null && Object.keys(settings.usermap).length > 0;
+    const hasProjectmap =
+      settings.projectmap !== null &&
+      Object.keys(settings.projectmap).length > 0;
 
-      strWithMigLine = strWithMigLine.replace(
-        this.userProjectRegex,
-        matched => {
-          if (matched.startsWith('@')) {
-            // this is a userid
-            return '@' + settings.usermap[matched.substr(1)];
-          } else if (matched.endsWith('#')) {
-            // this is a cross-project issue reference
-            return (
-              settings.projectmap[matched.substring(0, matched.length - 1)] +
-              '#'
-            );
-          } else {
-            // something went wrong, do nothing
-            return matched;
+    if (add_line) str = GithubHelper.addMigrationLine(str, item, repoLink);
+    let reString = '';
+
+    //
+    // User name conversion
+    //
+
+    if (hasUsermap) {
+      reString = '@' + Object.keys(settings.usermap).join('|@');
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        match => '@' + settings.usermap[match.substring(1)]
+      );
+    }
+
+    //
+    // Issue reference conversion
+    //
+
+    let issueReplacer = (match: string) => {
+      // TODO: issueMap
+      return '#' + match;
+    };
+
+    if (hasProjectmap) {
+      reString =
+        '(' + Object.keys(settings.projectmap).join(')#(\\d+)|(') + ')#(\\d+)';
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        (_, p1, p2) => settings.projectmap[p1] + '#' + issueReplacer(p2)
+      );
+    }
+    reString = '(?<=\\W)#(\\d+)';
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) => issueReplacer(p1));
+
+    //
+    // Milestone reference replacement
+    //
+
+    let milestoneReplacer = (
+      number: string = '',
+      title: string = '',
+      repo: string = ''
+    ) => {
+      let milestone: SimpleMilestone;
+      if (this.milestoneMap) {
+        if (number) {
+          milestone = this.milestoneMap.get(parseInt(number));
+        } else if (title) {
+          for (let m of this.milestoneMap.values()) {
+            if (m.title === title) {
+              milestone = m;
+              break;
+            }
           }
         }
+      }
+      if (milestone) {
+        const repoLink = `${this.githubUrl}/${this.githubOwner}/${
+          repo || this.githubRepo
+        }`;
+        return `[${milestone.title}](${repoLink}/milestone/${milestone.number})`;
+      }
+      console.log(
+        `\tMilestone '${number || title}' not found in milestone map.`
+      );
+      return `'Reference to deleted milestone ${number || title}'`;
+    };
+
+    if (hasProjectmap) {
+      // Replace: project%"Milestone"
+      reString =
+        '(' +
+        Object.keys(settings.projectmap).join(')%(".*?")|(') +
+        ')%(".*?")';
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        (_, p1, p2) => `Milestone ${p2} in ${settings.projectmap[p1]}`
       );
 
-      strWithMigLine = await utils.migrateAttachments(
-        strWithMigLine,
-        this.repoId,
-        settings.s3,
-        this.gitlabHelper
+      // Replace: project%nn
+      reString =
+        '(' + Object.keys(settings.projectmap).join(')%(\\d+)|(') + ')%(\\d+)';
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        (_, p1, p2) =>
+          `[Milestone ${p2} in ${settings.projectmap[p1]}](${this.githubUrl}/${this.githubOwner}/${settings.projectmap[p1]})`
       );
-
-      return strWithMigLine;
     }
+    // Replace: %"Milestone"
+    reString = '(?<=\\W)%"(.*?)"';
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
+      milestoneReplacer('', p1)
+    );
+
+    // Replace: %nn
+    reString = '(?<=\\W)%(\\d+)';
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) =>
+      milestoneReplacer(p1, '')
+    );
+
+    //
+    // Label reference conversion
+    //
+
+    // FIXME: strike through in markdown is done as in: ~this text~
+    // These regexes will capture ~this as a label. If it is among the migrated
+    // labels, then it will be linked.
+
+    let labelReplacer = (label: string) => {};
+
+    // // Single word named label
+    // if (hasProjectmap) {
+    //   const reChunk = '~([^~\\s\\.,;:\'"!@()\\\\\\[\\]])+(?=[^~\\w])';
+    //   reString =
+    //     '('
+    //     + Object.keys(settings.projectmap).join(')' + reChunk + '|(')
+    //     + ')'
+    //     + reChunk;
+    //   str = str.replace(new RegExp(reString, 'g'),
+    //   (_, p1, p2) => )
+
+    //   TODO
+    // } else {
+    //   ...
+    // }
+
+    // // Quoted named label
+    // reString = '~"([^~"]|\\w)+"(?=[^~\\w])';
+
+    //
+    // MR reference conversion
+    //
+    // TODO
+
+    str = await utils.migrateAttachments(
+      str,
+      this.repoId,
+      settings.s3,
+      this.gitlabHelper
+    );
+
+    return str;
   }
 
   // ----------------------------------------------------------------------------
@@ -1196,7 +1301,7 @@ export class GithubHelper {
       return str;
     }
 
-    const dateformatOptions : Intl.DateTimeFormatOptions = {
+    const dateformatOptions: Intl.DateTimeFormatOptions = {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -1224,7 +1329,7 @@ export class GithubHelper {
    * When migrating in-line comments to GitHub then creates a link to the
    * appropriate line of the diff.
    */
-  static createLineRef(position, repoLink) {
+  static createLineRef(position, repoLink: string): string {
     if (
       !repoLink ||
       !repoLink.startsWith(gitHubLocation) ||
@@ -1259,6 +1364,20 @@ export class GithubHelper {
     // Mention the file and line number. If we can't get this for some reason then use the commit id instead.
     const ref = path && line ? `${path} line ${line}` : `${head_sha}`;
     return `Commented on [${ref}](${repoLink}/compare/${base_sha}..${head_sha}${slug})\n\n`;
+  }
+
+  /**
+   * Meh...
+   * @param milestoneMap
+   */
+  async registerMilestoneMap(milestoneMap?: Map<number, SimpleMilestone>) {
+    if (milestoneMap) {
+      this.milestoneMap = milestoneMap;
+    } else if (!milestoneMap && !this.milestoneMap) {
+      let milestoneData = await this.getAllGithubMilestones();
+      this.milestoneMap = new Map<number, SimpleMilestone>();
+      milestoneData.forEach(m => this.milestoneMap.set(m.number, m));
+    }
   }
 
   /**

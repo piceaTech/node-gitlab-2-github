@@ -8,7 +8,8 @@ export default {
     sessionCookie: null,
   },
   github: {
-    // baseUrl: 'https://gitlab.mycompany.com:123/etc',
+    // baseUrl: 'https://github.mycompany.com:123/etc',
+    // apiUrl: 'https//api.github.mycompany.com',
     owner: '{{repository owner (user or organization)}}',
     token: '{{token}}',
     token_owner: '{{token_owner}}',
@@ -41,6 +42,7 @@ export default {
   },
   debug: false,
   useIssueImportAPI: true,
+  usePlaceholderMilestonesForMissingMilestones: true,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,

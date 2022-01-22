@@ -1,9 +1,21 @@
 import { Gitlab } from '@gitbeaker/node';
+import {
+  IssueSchema,
+  MergeRequestSchema,
+  MilestoneSchema,
+  NoteSchema,
+  UserSchema,
+} from '@gitbeaker/core/dist/types/types';
 import { GitlabSettings } from './settings';
 import axios from 'axios';
 
+export type GitLabIssue = IssueSchema;
+export type GitLabNote = NoteSchema;
+export type GitLabUser = Omit<UserSchema, 'created_at'>;
+export type GitLabMilestone = MilestoneSchema;
+export type GitLabMergeRequest = MergeRequestSchema;
 
-export default class GitlabHelper {
+export class GitlabHelper {
   // Wait for this issue to be resolved
   // https://github.com/jdalrymple/gitbeaker/issues/793
   gitlabApi: InstanceType<typeof Gitlab>;
@@ -26,6 +38,9 @@ export default class GitlabHelper {
     this.gitlabToken = gitlabSettings.token;
     this.gitlabProjectId = gitlabSettings.projectId;
     this.host = gitlabSettings.url ? gitlabSettings.url : 'http://gitlab.com';
+    this.host = this.host.endsWith('/')
+      ? this.host.substring(0, this.host.length - 1)
+      : this.host;
     this.sessionCookie = gitlabSettings.sessionCookie;
     this.allBranches = null;
   }
@@ -38,13 +53,13 @@ export default class GitlabHelper {
       const projects = await this.gitlabApi.Projects.all({ membership: true });
 
       // print each project with info
-      for (let i = 0; i < projects.length; i++) {
+      for (let project of projects) {
         console.log(
-          projects[i].id.toString(),
+          project.id.toString(),
           '\t',
-          projects[i].name,
+          project.name,
           '\t--\t',
-          projects[i]['description']
+          project['description']
         );
       }
 
@@ -76,13 +91,13 @@ export default class GitlabHelper {
   /**
    * Gets all notes for a given issue.
    */
-  async getIssueNotes(issueIid: number) {
+  async getIssueNotes(issueIid: number): Promise<GitLabNote[]> {
     try {
-      return (await this.gitlabApi.IssueNotes.all(
+      return await this.gitlabApi.IssueNotes.all(
         this.gitlabProjectId,
         issueIid,
         {}
-      )) as any[];
+      );
     } catch (err) {
       console.error(`Could not fetch notes for GitLab issue #${issueIid}.`);
       return [];
@@ -94,16 +109,18 @@ export default class GitlabHelper {
    */
   async getAttachment(relurl: string) {
     try {
-      const host = this.host.endsWith('/') ? this.host : this.host + '/';
-      const attachmentUrl = host + this.projectPath + relurl;
-      const data = (await axios.get(attachmentUrl, {
+      const attachmentUrl = this.host + '/' + this.projectPath + relurl;
+      const data = (
+        await axios.get(attachmentUrl, {
           responseType: 'arraybuffer',
           headers: {
             // HACK: work around GitLab's API lack of GET for attachments
             // See https://gitlab.com/gitlab-org/gitlab/-/issues/24155
-            Cookie: `_gitlab_session=${this.sessionCookie}`
-          }})).data;
-      return Buffer.from(data, 'binary')
+            Cookie: `_gitlab_session=${this.sessionCookie}`,
+          },
+        })
+      ).data;
+      return Buffer.from(data, 'binary');
     } catch (err) {
       console.error(`Could not download attachment #${relurl}.`);
       return null;
@@ -114,8 +131,10 @@ export default class GitlabHelper {
    * Gets all branches.
    */
   async getAllBranches() {
-    if (!this.allBranches){
-      this.allBranches = await this.gitlabApi.Branches.all(this.gitlabProjectId);
+    if (!this.allBranches) {
+      this.allBranches = await this.gitlabApi.Branches.all(
+        this.gitlabProjectId
+      );
     }
     return this.allBranches as any[];
   }
@@ -123,13 +142,13 @@ export default class GitlabHelper {
   /**
    * Gets all notes for a given merge request.
    */
-  async getAllMergeRequestNotes(pullRequestIid: number) {
+  async getAllMergeRequestNotes(pullRequestIid: number): Promise<GitLabNote[]> {
     try {
-      return (this.gitlabApi.MergeRequestNotes.all(
+      return this.gitlabApi.MergeRequestNotes.all(
         this.gitlabProjectId,
         pullRequestIid,
         {}
-      ) as any) as any[];
+      );
     } catch (err) {
       console.error(
         `Could not fetch notes for GitLab merge request #${pullRequestIid}.`
