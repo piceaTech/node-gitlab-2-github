@@ -885,8 +885,8 @@ export class GithubHelper {
 
       try {
         // try to create the GitHub pull request from the GitLab issue
-        await this.githubApi.pulls.create(props);
-        return Promise.resolve({ data: null }); // need to return null promise for parent to wait on
+        const response = await this.githubApi.pulls.create(props);
+        return Promise.resolve(response);
       } catch (err) {
         if (err.status === 422) {
           console.error(
