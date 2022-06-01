@@ -15,7 +15,6 @@ import { default as readlineSync } from 'readline-sync';
 import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
-import { sleep } from './utils';
 
 const counters = {
   nrOfPlaceholderIssues: 0,
@@ -68,16 +67,17 @@ const githubApi = new MyOctokit({
       console.log(
         `Request quota exhausted for request ${options.method} ${options.url}`
       );
-      await sleep(60000);
+      console.log(`Retrying after ${retryAfter} seconds!`);
       return true;
     },
     onAbuseLimit: async (retryAfter, options) => {
       console.log(
         `Abuse detected for request ${options.method} ${options.url}`
       );
-      await sleep(60000);
+      console.log(`Retrying after ${retryAfter} seconds!`);
       return true;
     },
+    minimumAbuseRetryAfter: 1000,
   },
 });
 
