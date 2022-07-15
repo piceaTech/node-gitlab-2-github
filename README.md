@@ -40,6 +40,20 @@ The user must be a member of the project you want to copy. This user must be the
 1. edit settings.ts
 1. run `npm run start`
 
+### Docker
+
+If you don't have Node.js installed in your local environment and don't want to install it you can use the Dockerized approach. 
+
+1. Make sure that you have [Docker](https://docs.docker.com/engine/install/) installed in your computer. You can test running `docker version` in the terminal.
+1. `cp sample_settings.ts settings.ts`
+1. edit settings.ts
+1. `docker build -t node-gitlab-2-github:latest .`
+1. `docker run node-gitlab-2-github:latest`
+
+If you want to let it run in the background (detached mode), just use the following command:
+
+1. `docker run -d node-gitlab-2-github:latest`
+
 ## Where to find info for the `settings.ts`
 
 ### gitlab
