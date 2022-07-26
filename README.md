@@ -54,6 +54,20 @@ If you want to let it run in the background (detached mode), just use the follow
 
 1. `docker run -d node-gitlab-2-github:latest`
 
+### Docker with bind mounts
+
+In order to optimize the usage of the dockerized application, one can use the `bind mounts` feature of Docker ([Docker docs](https://docs.docker.com/storage/bind-mounts/)). This way, whenever you change the `settings.ts` file in the host environment it will change in the container filesystem as well.
+
+The process to use this trick is pretty much the same we presented before, the only different is the addition of a flag in the docker command to tell it what is the directory/file to be bound.
+
+1. Make sure that you have [Docker](https://docs.docker.com/engine/install/) installed in your computer. You can test running `docker version` in the terminal.
+1. `cp sample_settings.ts settings.ts`
+1. edit settings.ts
+1. `docker build -t node-gitlab-2-github:latest .`
+1. This command must work for **Linux** or **Mac**: `docker run --mount type=bind,source="$(pwd)/settings.ts",target="/app/settings.ts",readonly node-gitlab-2-github:latest`
+
+* If you want to run this last command in the Windows environment, please consult the Docker documentation on how to solve the problem of the pwd command expanding incorrectly there - [Docker documentation - Topics for windows](https://docs.docker.com/desktop/troubleshoot/topics/#topics-for-windows).
+
 ## Where to find info for the `settings.ts`
 
 ### gitlab
