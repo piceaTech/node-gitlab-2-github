@@ -50,7 +50,7 @@ The URL under which your gitlab instance is hosted. Default is the official `htt
 
 #### gitlab.token
 
-Go to [Settings / Access Tokens](https://gitlab.com/profile/personal_access_tokens). Create a new Access Token with `api` and `read_repository` scopes and copy that into the `settings.ts`
+Go to [Settings / Access Tokens](https://gitlab.com/-/profile/personal_access_tokens). Create a new Access Token with `api` and `read_repository` scopes and copy that into the `settings.ts`
 
 #### gitlab.projectID
 
