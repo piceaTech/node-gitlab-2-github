@@ -1,5 +1,5 @@
-CONTAINER_IMAGE := node-gitlab-2-github
-CONTAINER_TAG := latest
+CONTAINER_IMAGE ?= node-gitlab-2-github
+CONTAINER_TAG ?= latest
 LOCAL_PWD = $(shell pwd)
 
 .PHONY: build-image
