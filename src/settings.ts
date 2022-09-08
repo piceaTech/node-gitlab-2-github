@@ -38,6 +38,7 @@ export interface GithubSettings {
   baseUrl?: string;
   apiUrl?: string;
   owner: string;
+  ownerIsOrg?: boolean;
   token: string;
   token_owner: string;
   repo: string;

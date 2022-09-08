@@ -60,7 +60,9 @@ export class GithubHelper {
   githubApi: GitHubApi;
   githubUrl: string;
   githubOwner: string;
+  githubOwnerIsOrg: boolean;
   githubToken: string;
+  githubTokenOwner: string;
   githubRepo: string;
   githubTimeout?: number;
   gitlabHelper: GitlabHelper;
@@ -80,7 +82,9 @@ export class GithubHelper {
       ? githubSettings.baseUrl
       : gitHubLocation;
     this.githubOwner = githubSettings.owner;
+    this.githubOwnerIsOrg = githubSettings.ownerIsOrg ?? false;
     this.githubToken = githubSettings.token;
+    this.githubTokenOwner = githubSettings.token_owner;
     this.githubRepo = githubSettings.repo;
     this.githubTimeout = githubSettings.timeout;
     this.gitlabHelper = gitlabHelper;
@@ -1398,11 +1402,20 @@ export class GithubHelper {
       else console.error(`\n\tSomething went wrong: ${err}.`);
     }
     try {
-      console.log(`Creating repo ${params.owner}/${params.repo}...`);
-      await this.githubApi.repos.createForAuthenticatedUser({
-        name: this.githubRepo,
-        private: true,
-      });
+      if (this.githubOwnerIsOrg) {
+        console.log(`Creating repo in organisation ${this.githubOwner}/${this.githubRepo}...`);
+        await this.githubApi.repos.createInOrg({
+          org: this.githubOwner,
+          name: this.githubRepo,
+          private: true,
+        });
+      } else {
+        console.log(`Creating repo ${this.githubTokenOwner}/${this.githubRepo}...`);
+        await this.githubApi.repos.createForAuthenticatedUser({
+          name: this.githubRepo,
+          private: true,
+        });
+      }
       console.log('\t...done.');
     } catch (err) {
       console.error(`\n\tSomething went wrong: ${err}.`);
