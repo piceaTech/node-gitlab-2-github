@@ -11,6 +11,7 @@ export default {
     // baseUrl: 'https://github.mycompany.com:123/etc',
     // apiUrl: 'https//api.github.mycompany.com',
     owner: '{{repository owner (user or organization)}}',
+    ownerIsOrg: false,
     token: '{{token}}',
     token_owner: '{{token_owner}}',
     repo: '{{repo}}',

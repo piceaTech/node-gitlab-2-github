@@ -74,6 +74,10 @@ Point this to the api. The default is `api.github.com`.
 
 Under which organisation or user will the new project be hosted
 
+#### github.ownerIsOrg
+
+A boolean indicator (default is *false*) to specify that the owner of this repo is an Organisation.
+
 #### github.token
 
 Go to [Settings / Developer settings / Personal access tokens](https://github.com/settings/tokens). Generate a new token with `repo` scope and copy that into the `settings.ts`
@@ -89,6 +93,8 @@ What is the name of the new repo
 #### github.recreateRepo
 
 If true (default is false), we will try to delete the destination github repository if present, and (re)create it. The github token must be granted `delete_repo` scope. The newly created repository will be made private by default.
+
+If you've set `github.recreateRepo` to true and the repo belongs to an Organisation, the `github.ownerIsOrg` flag **must** be set as true.
 
 This is useful when debugging this tool or a specific migration. You will always be prompted for confirmation.
 
