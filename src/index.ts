@@ -340,6 +340,7 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
     const hasAttachmentLabel = {
       name: 'has attachment',
       color: '#fbca04',
+      description: 'Attachment was not transfered from GitLab',
     };
     labels.push(hasAttachmentLabel);
   }
@@ -347,6 +348,7 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   const gitlabMergeRequestLabel = {
     name: 'gitlab merge request',
     color: '#b36b00',
+    description: '',
   };
   labels.push(gitlabMergeRequestLabel);
 
