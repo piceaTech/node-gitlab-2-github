@@ -48,6 +48,7 @@ export default {
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,
   filterByLabel: null,
+  trimOversizedLabelDescriptions: false,
   skipMergeRequestStates: [],
   skipMatchingComments: [],
   mergeRequests: {
