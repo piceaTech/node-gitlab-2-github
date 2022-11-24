@@ -51,6 +51,7 @@ export interface GitlabSettings {
   url?: string;
   token: string;
   projectId: number;
+  listArchivedProjects?: boolean;
   sessionCookie: string;
 }
 
