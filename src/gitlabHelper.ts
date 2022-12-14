@@ -23,6 +23,7 @@ export class GitlabHelper {
   gitlabUrl?: string;
   gitlabToken: string;
   gitlabProjectId: number;
+  archived?: boolean;
   sessionCookie: string;
 
   host: string;
@@ -41,6 +42,7 @@ export class GitlabHelper {
     this.host = this.host.endsWith('/')
       ? this.host.substring(0, this.host.length - 1)
       : this.host;
+    this.archived = gitlabSettings.listArchivedProjects ?? true;
     this.sessionCookie = gitlabSettings.sessionCookie;
     this.allBranches = null;
   }
@@ -50,7 +52,12 @@ export class GitlabHelper {
    */
   async listProjects() {
     try {
-      const projects = await this.gitlabApi.Projects.all({ membership: true });
+      let projects;
+      if (this.archived) {
+        projects = await this.gitlabApi.Projects.all({ membership: true });
+      } else {
+        projects = await this.gitlabApi.Projects.all({ membership: true, archived: this.archived });
+      }
 
       // print each project with info
       for (let project of projects) {

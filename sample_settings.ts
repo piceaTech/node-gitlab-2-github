@@ -5,6 +5,7 @@ export default {
     // url: 'https://gitlab.mycompany.com',
     token: '{{gitlab private token}}',
     projectId: null,
+    listArchivedProjects: true,
     sessionCookie: null,
   },
   github: {
