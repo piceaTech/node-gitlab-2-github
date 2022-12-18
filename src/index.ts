@@ -237,7 +237,12 @@ async function transferDescription() {
 
   let project = await gitlabApi.Projects.show(settings.gitlab.projectId);
 
-  await githubHelper.updateRepositoryDescription(project.description);
+  if (project.description) {
+    await githubHelper.updateRepositoryDescription(project.description);
+    console.log('Done.');
+  } else {
+    console.log('Description is empty, nothing to transfer.')
+  }
 }
 
 // ----------------------------------------------------------------------------
