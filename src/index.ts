@@ -524,8 +524,12 @@ async function transferMergeRequests() {
       i => i.title.trim() === mr.title.trim()
     );
     let githubIssue = githubIssues.find(
-      // allow for issues titled "Original Issue Name [merged]"
-      i => i.title.trim().includes(mr.title.trim())
+      // allow for issues titled "Original Issue Name - [merged|closed]"
+      i => {
+        // regex needs escaping in case merge request title contains special characters
+        const regex = new RegExp(escapeRegExp(mr.title.trim()) + ' - \\[(merged|closed)\\]');
+        return regex.test(i.title.trim());
+      }
     );
     if (!githubRequest && !githubIssue) {
       if (settings.skipMergeRequestStates.includes(mr.state)) {
@@ -678,4 +682,8 @@ function inform(msg: string) {
   console.log('==================================');
   console.log(msg);
   console.log('==================================');
+}
+
+function escapeRegExp(string) {
+   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
