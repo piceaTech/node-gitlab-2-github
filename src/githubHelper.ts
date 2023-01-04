@@ -321,7 +321,7 @@ export class GithubHelper {
     let props: RestEndpointMethodTypes['repos']['update']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
-      description: description.replace(/\s+/g, ' '),
+      description: description?.replace(/\s+/g, ' ') || '',
     };
     return this.githubApi.repos.update(props);
   }
