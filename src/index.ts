@@ -16,6 +16,11 @@ import * as fs from 'fs';
 
 import AWS from 'aws-sdk';
 
+const CCERROR = '\x1b[31m%s\x1b[0m'; // red
+const CCWARN = '\x1b[33m%s\x1b[0m'; // yellow
+const CCINFO = '\x1b[36m%s\x1b[0m'; // cyan
+const CCSUCCESS = '\x1b[32m%s\x1b[0m'; // green
+
 const counters = {
   nrOfPlaceholderIssues: 0,
   nrOfReplacementIssues: 0,
@@ -331,6 +336,9 @@ async function transferMilestones(usePlaceholders: boolean) {
  */
 async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   inform('Transferring Labels');
+  console.warn(CCWARN,'NOTE (2022): GitHub descriptions are limited to 100 characters, and do not accept 4-byte Unicode');
+
+  const invalidUnicode = /[\u{10000}-\u{10FFFF}]|(?![*#0-9]+)[\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}]/gu;
 
   // Get a list of all labels associated with this project
   let labels: SimpleLabel[] = await gitlabApi.Labels.all(
@@ -345,6 +353,7 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
     const hasAttachmentLabel = {
       name: 'has attachment',
       color: '#fbca04',
+      description: 'Attachment was not transfered from GitLab',
     };
     labels.push(hasAttachmentLabel);
   }
@@ -352,6 +361,7 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
   const gitlabMergeRequestLabel = {
     name: 'gitlab merge request',
     color: '#b36b00',
+    description: '',
   };
   labels.push(gitlabMergeRequestLabel);
 
@@ -362,6 +372,28 @@ async function transferLabels(attachmentLabel = true, useLowerCase = true) {
 
     if (!githubLabels.find(l => l === label.name)) {
       console.log('Creating: ' + label.name);
+
+      if (label.description) {
+        if (label.description.match(invalidUnicode)) {
+          console.warn(CCWARN,`⚠️ Removed invalid unicode characters from description.`);
+          const cleanedDescription = label.description.replace(invalidUnicode, '').trim();
+          console.debug(` "${label.description}"\n\t to\n "${cleanedDescription}"`);
+          label.description = cleanedDescription;
+        }
+        if (label.description.length > 100) {
+          const trimmedDescription = label.description.slice(0,100).trim();
+          if (settings.trimOversizedLabelDescriptions) {
+            console.warn(CCWARN,`⚠️ Description too long (${label.description.length}), it was trimmed:`);
+            console.debug(` "${label.description}"\n\t to\n "${trimmedDescription}"`);
+            label.description = trimmedDescription;
+          } else {
+            console.warn(CCWARN,`⚠️ Description too long (${label.description.length}), it was excluded.`);
+            console.debug(` "${label.description}"`);
+            label.description = '';
+          }
+        }
+      }
+
       try {
         // process asynchronous code in sequence
         await githubHelper.createLabel(label).catch(x => {});
