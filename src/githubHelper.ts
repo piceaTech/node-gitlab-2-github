@@ -474,7 +474,7 @@ export class GithubHelper {
     }
 
     const issue_number = await this.requestImportIssue(
-      issue.author,
+      issue.isPlaceholder ? undefined : issue.author,
       props,
       comments
     );
@@ -553,12 +553,14 @@ export class GithubHelper {
    * @returns GitHub issue number or null if import failed
    */
   async requestImportIssue(
-    author: GitLabUser,
+    author: GitLabUser | undefined,
     issue: IssueImport,
     comments: CommentImport[]
   ): Promise<number | null> {
     // create the GitHub issue from the GitLab issue
-    let pending = await this.getUserGitHubApi(author).request(
+    const api = author ? this.getUserGitHubApi(author) : this.getDefaultGitHubApi()
+
+    let pending = await api.request(
       `POST /repos/${settings.github.owner}/${settings.github.repo}/import/issues`,
       {
         issue: issue,
@@ -569,7 +571,7 @@ export class GithubHelper {
     let result = null;
     while (true) {
       await utils.sleep(this.delayInMs);
-      result = await this.getUserGitHubApi(author).request(
+      result = await api.request(
         `GET /repos/${settings.github.owner}/${settings.github.repo}/import/issues/${pending.data.id}`
       );
       if (
