@@ -13,9 +13,17 @@ export default {
     // apiUrl: 'https://api.github.mycompany.com',
     owner: '{{repository owner (user or organization)}}',
     ownerIsOrg: false,
-    token: '{{token}}',
-    token_owner: '{{token_owner}}',
     repo: '{{repo}}',
+    tokens: [
+      {
+        value: '{{token of first github user}}',
+        owner: '{{github user 1}}',
+      },
+      {
+        value: '{{token of second github user}}',
+        owner: '{{github user 2}}',
+      },
+    ],
     recreateRepo: false,
   },
   s3: {
