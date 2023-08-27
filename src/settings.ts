@@ -1,10 +1,11 @@
 export default interface Settings {
-  debug: boolean;
+  dryRun: boolean;
   gitlab: GitlabSettings;
   github: GithubSettings;
   usermap: {
     [key: string]: string;
   };
+  inactiveUserSettings?:InactiveUserSettings;
   projectmap: {
     [key: string]: string;
   };
@@ -61,3 +62,8 @@ export interface S3Settings {
   secretAccessKey: string;
   bucket: string;
 }
+
+export interface InactiveUserSettings {
+    inactiveUserArray: string[];
+    prepend: string;
+  }

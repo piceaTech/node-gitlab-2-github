@@ -182,7 +182,7 @@ If this is set to true (default) then the migration process will transfer releas
 Note that github api for releases is limited and hence this will only transfer the title and description of the releases
 and add them to github in chronological order, but it would not preserve the original release dates, nor transfer artefacts or assets.
 
-### debug
+### dryRun
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls
 
@@ -233,6 +233,9 @@ Object consisting of `logfile` and `log`. If `log` is set to true, then the merg
 ### usermap
 
 Maps gitlab user names to github users. This is used to properly set assignees in issues and PRs and to translate mentions in issues.
+
+### inactiveUserSettings
+Takes a list of user names from GitLab, and the mentions of these users in issues and PRs will be prefixed with a `prepend` string when they are migrated to GitHub. This will be mostly used when migrating inactive users from GitLab to GitHub, ensuring that the inactive user names don't collide with existing GitHub users.
 
 ### projectmap
 

@@ -4,9 +4,9 @@ export default {
   gitlab: {
     // url: 'https://gitlab.mycompany.com',
     token: '{{gitlab private token}}',
-    projectId: null,
+    projectId: 0,
     listArchivedProjects: true,
-    sessionCookie: null,
+    sessionCookie: "",
   },
   github: {
     // baseUrl: 'https://github.mycompany.com:123/etc',
@@ -27,6 +27,10 @@ export default {
     'username.gitlab.1': 'username.github.1',
     'username.gitlab.2': 'username.github.2',
   },
+  inactiveUserSettings: {
+    inactiveUserArray: [],
+    prepend: "👻"
+  },
   projectmap: {
     'gitlabgroup/projectname.1': 'GitHubOrg/projectname.1',
     'gitlabgroup/projectname.2': 'GitHubOrg/projectname.2',
@@ -42,13 +46,13 @@ export default {
     mergeRequests: true,
     releases: true,
   },
-  debug: false,
+  dryRun: false,
   useIssueImportAPI: true,
   usePlaceholderMilestonesForMissingMilestones: true,
   usePlaceholderIssuesForMissingIssues: true,
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,
-  filterByLabel: null,
+  filterByLabel: undefined,
   trimOversizedLabelDescriptions: false,
   skipMergeRequestStates: [],
   skipMatchingComments: [],

@@ -353,7 +353,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve({ data: issue });
+    if (settings.dryRun) return Promise.resolve({ data: issue });
 
     return this.githubApi.issues.create(props);
   }
@@ -454,7 +454,7 @@ export class GithubHelper {
     props.milestone = this.convertMilestone(issue);
     props.labels = this.convertLabels(issue);
 
-    if (settings.debug) return Promise.resolve({ data: issue });
+    if (settings.dryRun) return Promise.resolve({ data: issue });
 
     //
     // Issue comments
@@ -676,7 +676,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return true;
+    if (settings.dryRun) return true;
 
     await this.githubApi.issues
       .createComment({
@@ -711,7 +711,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve();
+    if (settings.dryRun) return Promise.resolve();
 
     return await this.githubApi.issues.update(props);
   }
@@ -746,7 +746,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve({ number: -1, title: 'DEBUG' });
+    if (settings.dryRun) return Promise.resolve({ number: -1, title: 'DEBUG' });
 
     const created = await this.githubApi.issues.createMilestone(
       githubMilestone
@@ -772,7 +772,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) return Promise.resolve();
+    if (settings.dryRun) return Promise.resolve();
     // create the GitHub label
     return await this.githubApi.issues.createLabel(githubLabel);
   }
@@ -870,7 +870,7 @@ export class GithubHelper {
       }
     }
 
-    if (settings.debug) return Promise.resolve({ data: mergeRequest });
+    if (settings.dryRun) return Promise.resolve({ data: mergeRequest });
 
     if (canCreate) {
       let bodyConverted = await this.convertIssuesAndComments(
@@ -1055,7 +1055,7 @@ export class GithubHelper {
     if (
       mergeRequest.state === 'merged' &&
       pullRequest.state !== 'closed' &&
-      !settings.debug
+      !settings.dryRun
     ) {
       // Merging the pull request adds new commits to the tree; to avoid that, just close the merge requests
       mergeRequest.state = 'closed';
@@ -1074,7 +1074,7 @@ export class GithubHelper {
 
     await utils.sleep(this.delayInMs);
 
-    if (settings.debug) {
+    if (settings.dryRun) {
       return Promise.resolve();
     }
 
@@ -1148,6 +1148,10 @@ export class GithubHelper {
     const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
     const hasUsermap =
       settings.usermap !== null && Object.keys(settings.usermap).length > 0;
+    const hasInactiveUserSetting: boolean = 
+      settings.inactiveUserSettings?.inactiveUserArray !== null && 
+      settings.inactiveUserSettings?.inactiveUserArray?.length > 0;
+
     const hasProjectmap =
       settings.projectmap !== null &&
       Object.keys(settings.projectmap).length > 0;
@@ -1165,6 +1169,18 @@ export class GithubHelper {
         new RegExp(reString, 'g'),
         match => '@' + settings.usermap[match.substring(1)]
       );
+    }
+
+    //
+    // Inactive User mentions
+    //
+
+    if (hasInactiveUserSetting) {
+        let reString = `@(${settings.inactiveUserSettings?.inactiveUserArray.join('|')})`;
+        str = str.replace(
+            new RegExp(reString, 'g'),
+            match => `@${settings.inactiveUserSettings?.prepend}${match.substring(1)}`
+        );
     }
 
     //
