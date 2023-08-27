@@ -1,5 +1,5 @@
 export default interface Settings {
-  debug: boolean;
+  dryRun: boolean;
   gitlab: GitlabSettings;
   github: GithubSettings;
   usermap: {
