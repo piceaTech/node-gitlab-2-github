@@ -1178,7 +1178,7 @@ export class GithubHelper {
         let reString = `@(${settings.inactiveUserSettings?.inactiveUserArray.join('|')})`;
         str = str.replace(
             new RegExp(reString, 'g'),
-            match => `@${settings.inactiveUserSettings?.prepend}${match.substring(1)}`
+            match => `${settings.inactiveUserSettings?.prepend}${match.substring(1)}`
         );
     }
 
