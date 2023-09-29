@@ -235,7 +235,7 @@ Object consisting of `logfile` and `log`. If `log` is set to true, then the merg
 Maps gitlab user names to github users. This is used to properly set assignees in issues and PRs and to translate mentions in issues.
 
 ### inactiveUserSettings
-Takes a list of user names from GitLab, and the mentions of these users in issues and PRs will be prefixed with a `prepend` string when they are migrated to GitHub. This will be mostly used when migrating inactive users from GitLab to GitHub, ensuring that the inactive user names don't collide with existing GitHub users.
+Takes a map of user names, fullnames from GitLab, and the mentions of these users in issues and PRs will be prefixed with a `prepend` string and the fullname from the value of the key when they are migrated to GitHub. This will be mostly used when migrating inactive users from GitLab to GitHub, ensuring that the inactive user names don't collide with existing GitHub users.
 
 ### projectmap
 
