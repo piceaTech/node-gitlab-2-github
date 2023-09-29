@@ -28,7 +28,8 @@ export default {
     'username.gitlab.2': 'username.github.2',
   },
   inactiveUserSettings: {
-    inactiveUserArray: [],
+    inactiveUserMap: {
+    },
     prepend: "👻"
   },
   projectmap: {

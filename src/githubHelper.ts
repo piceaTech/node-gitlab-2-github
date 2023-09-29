@@ -1148,9 +1148,9 @@ export class GithubHelper {
     const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
     const hasUsermap =
       settings.usermap !== null && Object.keys(settings.usermap).length > 0;
-    const hasInactiveUserSetting: boolean = 
-      settings.inactiveUserSettings?.inactiveUserArray !== null && 
-      settings.inactiveUserSettings?.inactiveUserArray?.length > 0;
+    const hasInactiveUserSettingMap =
+      settings.inactiveUserSettings?.inactiveUserMap !== null && 
+      Object.keys(settings.inactiveUserSettings?.inactiveUserMap).length > 0;
     const hasProjectmap =
       settings.projectmap !== null &&
       Object.keys(settings.projectmap).length > 0;
@@ -1174,11 +1174,11 @@ export class GithubHelper {
     // Inactive User mentions
     //
 
-    if (hasInactiveUserSetting) {
-        let reString = `@(${settings.inactiveUserSettings?.inactiveUserArray.join('|')})`;
+    if (hasInactiveUserSettingMap) {
+        reString = '@' + Object.keys(settings.inactiveUserSettings?.inactiveUserMap).join('|@');
         str = str.replace(
             new RegExp(reString, 'g'),
-            match => `${settings.inactiveUserSettings?.prepend}${match.substring(1)}`
+            match => `${settings.inactiveUserSettings?.prepend}${settings.inactiveUserSettings?.inactiveUserMap[match.substring(1)]} (${match.substring(1)})`
         );
     }
 

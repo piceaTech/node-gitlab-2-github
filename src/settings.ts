@@ -64,6 +64,8 @@ export interface S3Settings {
 }
 
 export interface InactiveUserSettings {
-    inactiveUserArray: string[];
+    inactiveUserMap: {
+        [key: string]: string;
+    };
     prepend: string;
 }
