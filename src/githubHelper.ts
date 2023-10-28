@@ -1304,6 +1304,7 @@ export class GithubHelper {
 
     str = await utils.migrateAttachments(
       str,
+      this.githubApi,
       this.repoId,
       settings.s3,
       this.gitlabHelper

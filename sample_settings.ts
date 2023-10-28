@@ -18,11 +18,15 @@ export default {
     repo: '{{repo}}',
     recreateRepo: false,
   },
-  s3: {
-    accessKeyId: '{{accessKeyId}}',
-    secretAccessKey: '{{secretAccessKey}}',
-    bucket: 'my-gitlab-bucket',
-  },
+//   s3: {
+//     accessKeyId: '{{accessKeyId}}',
+//     secretAccessKey: '{{secretAccessKey}}',
+//     bucket: 'my-gitlab-bucket',
+//   },
+githubAttachmentSettings: {
+    repo: '',
+    email: ''
+},
   usermap: {
     'username.gitlab.1': 'username.github.1',
     'username.gitlab.2': 'username.github.2',
@@ -61,4 +65,5 @@ export default {
     logFile: './merge-requests.json',
     log: false,
   },
+  
 } as Settings;

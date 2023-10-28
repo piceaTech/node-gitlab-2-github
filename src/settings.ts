@@ -34,6 +34,7 @@ export default interface Settings {
     log: boolean;
   };
   s3?: S3Settings;
+  githubAttachmentSettings?: GithubAttachmentSettings;
 }
 
 export interface GithubSettings {
@@ -62,6 +63,11 @@ export interface S3Settings {
   secretAccessKey: string;
   bucket: string;
 }
+
+export interface GithubAttachmentSettings {
+    repo: string;
+    email: string;
+  }
 
 export interface InactiveUserSettings {
     inactiveUserMap: {
