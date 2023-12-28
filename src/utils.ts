@@ -49,7 +49,13 @@ export const migrateAttachments = async (
       // Doesn't seem like it is easy to upload an issue to github, so upload to S3
       //https://stackoverflow.com/questions/41581151/how-to-upload-an-image-to-use-in-issue-comments-via-github-api
 
-      const s3url = `https://${s3.bucket}.s3.amazonaws.com/${relativePath}`;
+      // Attempt to fix issue #140
+      //const s3url = `https://${s3.bucket}.s3.amazonaws.com/${relativePath}`;
+      let hostname = `${s3.bucket}.s3.amazonaws.com`;
+      if (s3.region) {
+        hostname = `s3.${s3.region}.amazonaws.com/${s3.bucket}`;
+      }
+      const s3url = `https://${hostname}/${relativePath}`;
 
       const s3bucket = new S3();
       s3bucket.createBucket(() => {

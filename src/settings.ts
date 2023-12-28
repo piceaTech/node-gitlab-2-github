@@ -60,4 +60,5 @@ export interface S3Settings {
   accessKeyId: string;
   secretAccessKey: string;
   bucket: string;
+  region: string;
 }

@@ -42,7 +42,7 @@ The user must be a member of the project you want to copy. This user must be the
 
 ### Docker
 
-If you don't have Node.js installed in your local environment and don't want to install it you can use the Dockerized approach. 
+If you don't have Node.js installed in your local environment and don't want to install it you can use the Dockerized approach.
 
 1. Make sure that you have [Docker](https://docs.docker.com/engine/install/) installed in your computer. You can test running `docker version` in the terminal.
 1. `cp sample_settings.ts settings.ts`
@@ -143,6 +143,10 @@ IAM User who owns these credential must have [write permissions](https://docs.aw
 #### s3.bucket
 
 Existing bucket, with an appropriate security policy. One possible policy is to allow [public access](https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteAccessPermissionsReqd.html).
+
+#### s3.region
+
+Specify Region (example: us-west-1) of bucket [list of regions](https://docs.aws.amazon.com/general/latest/gr/s3.html)
 
 ### usermap
 
