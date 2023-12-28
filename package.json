@@ -31,7 +31,7 @@
     "@octokit/rest": "^18.12.0",
     "@octokit/types": "^6.34.0",
     "aws-sdk": "^2.1053.0",
-    "axios": "^0.24.0",
+    "axios": "^1.6.0",
     "mime-types": "^2.1.34",
     "readline-sync": "^1.4.10",
     "ts-node": "^10.4.0"
