@@ -40,8 +40,7 @@ export interface GithubSettings {
   apiUrl?: string;
   owner: string;
   ownerIsOrg?: boolean;
-  token: string;
-  token_owner: string;
+  tokens: Token[];
   repo: string;
   timeout?: number;
   username?: string; // when is this set???
@@ -61,4 +60,9 @@ export interface S3Settings {
   secretAccessKey: string;
   bucket: string;
   region: string;
+}
+
+export interface Token {
+  value: string;
+  owner: string;
 }
