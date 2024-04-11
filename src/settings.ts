@@ -5,6 +5,7 @@ export default interface Settings {
   usermap: {
     [key: string]: string;
   };
+  inactiveUserSettings?:InactiveUserSettings;
   projectmap: {
     [key: string]: string;
   };
@@ -61,4 +62,9 @@ export interface S3Settings {
   secretAccessKey: string;
   bucket: string;
   region: string;
+}
+
+export interface InactiveUserSettings {
+    inactiveUserArray: string[];
+    prepend: string;
 }
