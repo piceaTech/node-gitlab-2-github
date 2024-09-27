@@ -224,6 +224,11 @@ async function migrate() {
         await transferMergeRequests();
       }
     }
+
+    if (settings.exportUsers) {
+      const users = Array.from(githubHelper.users.values()).join("\n");
+      fs.writeFileSync('users.txt', users);
+    }
   } catch (err) {
     console.error('Error during transfer:');
     console.error(err);

@@ -190,6 +190,12 @@ and add them to github in chronological order, but it would not preserve the ori
 
 As default it is set to false. Doesn't fire the requests to github api and only does the work on the gitlab side to test for wonky cases before using up api-calls
 
+### exportUsers
+
+If this is set to true (default is false) then a file called "users.txt" wil be created containing all
+usernames that contributed to the repository. You can use this with dryRun when you need to map users
+for the migration, but you do not know all the source usernames.
+
 ### useIssueImportAPI
 
 Set to true (default) to enable using the [GitHub preview API for importing issues](https://gist.github.com/jonmagic/5282384165e0f86ef105). This allows setting the date for issues and comments instead of inserting an additional line in the body.
