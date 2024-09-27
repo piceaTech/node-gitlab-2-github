@@ -44,6 +44,7 @@ export default {
     releases: true,
   },
   dryRun: false,
+  exportUsers: false,
   useIssueImportAPI: true,
   usePlaceholderMilestonesForMissingMilestones: true,
   usePlaceholderIssuesForMissingIssues: true,

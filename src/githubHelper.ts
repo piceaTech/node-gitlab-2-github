@@ -21,6 +21,9 @@ type GitHubPullRequest = PullsListResponseData[0];
 
 const gitHubLocation = 'https://github.com';
 
+// Source for regex: https://stackoverflow.com/a/30281147
+const usernameRegex = new RegExp('\\B@([a-z0-9](?:-(?=[a-z0-9])|[a-z0-9]){0,38}(?<=[a-z0-9]))', 'gi')
+
 interface CommentImport {
   created_at?: string;
   body: string;
@@ -71,6 +74,7 @@ export class GithubHelper {
   delayInMs: number;
   useIssuesForAllMergeRequests: boolean;
   milestoneMap?: Map<number, SimpleMilestone>;
+  users: Set<string>;
 
   constructor(
     githubApi: GitHubApi,
@@ -91,6 +95,7 @@ export class GithubHelper {
     this.gitlabHelper = gitlabHelper;
     this.delayInMs = 2000;
     this.useIssuesForAllMergeRequests = useIssuesForAllMergeRequests;
+    this.users = new Set<string>();
   }
 
   /*
@@ -305,6 +310,7 @@ export class GithubHelper {
    ******************************************************************************
    */
   userIsCreator(author: GitLabUser) {
+    this.users.add(author.username as string);
     return (
       author &&
       ((settings.usermap &&
@@ -366,6 +372,7 @@ export class GithubHelper {
     let assignees: string[] = [];
     for (let assignee of item.assignees) {
       let username: string = assignee.username as string;
+      this.users.add(username);
       if (username === settings.github.username) {
         assignees.push(settings.github.username);
       } else if (settings.usermap && settings.usermap[username]) {
@@ -516,6 +523,7 @@ export class GithubHelper {
     for (let note of notes) {
       if (this.checkIfNoteCanBeSkipped(note.body)) continue;
 
+      this.users.add(note.author.username);
       let userIsPoster =
         (settings.usermap &&
           settings.usermap[note.author.username] ===
@@ -1165,6 +1173,14 @@ export class GithubHelper {
         new RegExp(reString, 'g'),
         match => '@' + settings.usermap[match.substring(1)]
       );
+    }
+
+    // Store usernames found in the text
+    const matches: Array<string> = str.match(usernameRegex);
+    if (matches && matches.length > 0) {
+      for (const username of matches) {
+        this.users.add(username.substring(1));
+      }
     }
 
     //

@@ -1,5 +1,6 @@
 export default interface Settings {
   dryRun: boolean;
+  exportUsers: boolean;
   gitlab: GitlabSettings;
   github: GithubSettings;
   usermap: {
