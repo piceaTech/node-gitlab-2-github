@@ -1163,6 +1163,14 @@ export class GithubHelper {
     if (add_line) str = GithubHelper.addMigrationLine(str, item, repoLink);
     let reString = '';
 
+    // Store usernames found in the text
+    const matches: Array<string> = str.match(usernameRegex);
+    if (matches && matches.length > 0) {
+      for (const username of matches) {
+        this.users.add(username.substring(1));
+      }
+    }
+
     //
     // User name conversion
     //
@@ -1173,14 +1181,6 @@ export class GithubHelper {
         new RegExp(reString, 'g'),
         match => '@' + settings.usermap[match.substring(1)]
       );
-    }
-
-    // Store usernames found in the text
-    const matches: Array<string> = str.match(usernameRegex);
-    if (matches && matches.length > 0) {
-      for (const username of matches) {
-        this.users.add(username.substring(1));
-      }
     }
 
     //
