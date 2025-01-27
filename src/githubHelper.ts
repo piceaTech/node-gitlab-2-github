@@ -428,6 +428,12 @@ export class GithubHelper {
       labels.push('has attachment');
     }
 
+    labels.push('gitlab merge request');
+
+    if (item.state === 'merged') {
+      labels.push('merged');
+    }
+
     return labels;
   }
 
