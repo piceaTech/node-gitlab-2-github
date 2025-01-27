@@ -1381,7 +1381,7 @@ export class GithubHelper {
         line = position.old_line;
       }
       const crypto = require('crypto');
-      const hash = crypto.createHash('md5').update(path).digest('hex');
+      const hash = crypto.createHash('sha256').update(path).digest('hex');
       slug = `#diff-${hash}${side}${line}`;
     }
     // Mention the file and line number. If we can't get this for some reason then use the commit id instead.
