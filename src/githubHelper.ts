@@ -1329,6 +1329,10 @@ export class GithubHelper {
       this.gitlabHelper
     );
 
+    if ('web_url' in item) {
+      str += '\n\n*Migrated from GitLab: ' + item.web_url + '*';
+    }
+
     return str;
   }
 
