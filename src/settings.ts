@@ -11,6 +11,7 @@ export default interface Settings {
   };
   conversion: {
     useLowerCaseLabels: boolean;
+    addIssueInformation: boolean;
   };
   transfer: {
     description: boolean;

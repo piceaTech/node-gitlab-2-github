@@ -34,6 +34,7 @@ export default {
   },
   conversion: {
     useLowerCaseLabels: true,
+    addIssueInformation: true,
   },
   transfer: {
     description: true,

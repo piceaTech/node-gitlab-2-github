@@ -346,7 +346,9 @@ export class GithubHelper {
     let bodyConverted = await this.convertIssuesAndComments(
       issue.description ?? '',
       issue,
-      !this.userIsCreator(issue.author) || !issue.description
+      !this.userIsCreator(issue.author) || !issue.description,
+      true,
+      true,
     );
 
     let props: RestEndpointMethodTypes['issues']['create']['parameters'] = {
@@ -460,7 +462,9 @@ export class GithubHelper {
       : await this.convertIssuesAndComments(
           issue.description ?? '',
           issue,
-          !this.userIsCreator(issue.author) || !issue.description
+          !this.userIsCreator(issue.author) || !issue.description,
+          true,
+          true,
         );
 
     let props: IssueImport = {
@@ -985,7 +989,10 @@ export class GithubHelper {
     if (canCreate) {
       let bodyConverted = await this.convertIssuesAndComments(
         mergeRequest.description,
-        mergeRequest
+        mergeRequest,
+        true,
+        true,
+        true,
       );
 
       // GitHub API Documentation to create a pull request: https://developer.github.com/v3/pulls/#create-a-pull-request
@@ -1027,7 +1034,9 @@ export class GithubHelper {
     let bodyConverted = await this.convertIssuesAndComments(
       mergeStr + mergeRequest.description,
       mergeRequest,
-      !this.userIsCreator(mergeRequest.author) || !settings.useIssueImportAPI
+      !this.userIsCreator(mergeRequest.author) || !settings.useIssueImportAPI,
+      true,
+      true,
     );
 
     if (settings.useIssueImportAPI) {
@@ -1284,12 +1293,15 @@ export class GithubHelper {
    * @param str Body of the GitLab note
    * @param item GitLab item to which the note belongs
    * @param add_line Set to true to add the line with author and creation date
+   * @param add_line_ref Set to true to add the line ref to the comment
+   * @param add_issue_information Set to true to add assignees, reviewers, and approvers
    */
   async convertIssuesAndComments(
     str: string,
     item: GitLabIssue | GitLabMergeRequest | GitLabNote | MilestoneImport | GitLabDiscussionNote,
     add_line: boolean = true,
     add_line_ref: boolean = true,
+    add_issue_information: boolean = false,
   ): Promise<string> {
     // A note on implementation:
     // We don't convert project names once at the beginning because otherwise
@@ -1464,6 +1476,11 @@ export class GithubHelper {
       this.gitlabHelper
     );
 
+    if (add_issue_information && settings.conversion.addIssueInformation) {
+      let issue = item as GitLabIssue;
+      str = await this.addIssueInformation(issue, str)
+    }
+
     if ('web_url' in item) {
       str += '\n\n*Migrated from GitLab: ' + item.web_url + '*';
     }
@@ -1562,6 +1579,26 @@ export class GithubHelper {
     }
 
     return lineRef;
+  }
+
+  async addIssueInformation(issue: GitLabIssue | GitLabMergeRequest, description: string): Promise<string> {
+    let bodyConverted = description;
+
+    let assignees = issue.assignees.map(a => a.username) as string[];
+    bodyConverted += utils.organizationUsersString(assignees, "Assignees");
+
+    // check whether issue is of type GitLabMergeRequest
+    if (issue.reviewers) {
+      let mergeRequest = issue as GitLabMergeRequest;
+
+      let mrReviewers = mergeRequest.reviewers.map(a => a.username) as string[];
+      bodyConverted += utils.organizationUsersString(mrReviewers, 'Reviewers');
+
+      let approvals = await this.gitlabHelper.getMergeRequestApprovals(mergeRequest.iid);
+      bodyConverted += utils.organizationUsersString(approvals, 'Approved by');
+    }
+
+    return bodyConverted;
   }
 
   /**

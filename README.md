@@ -162,6 +162,10 @@ When one renames the project while transfering so that the projects don't loose 
 
 If this is set to true (default) then labels from GitLab will be converted to lowercase in GitHub.
 
+#### conversion.addIssueInformation
+
+If this is set to `true` (default) then issues and pull requests will get information about assignees (both), reviewers and approvers (PR only) added to their description.
+
 ### transfer
 
 #### transfer.milestones
