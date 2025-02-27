@@ -151,24 +151,24 @@ export class GitlabHelper {
     return this.allBranches as any[];
   }
 
-  async getMergeRequestApprovals(pullRequestIid: number): Promise<string[]> {
+  async getMergeRequestApprovals(mergeRequestIid: number): Promise<string[]> {
     try {
-      let approvals = await this.gitlabApi.MergeRequestApprovals.showConfiguration(
+      let approvals = await this.gitlabApi.MergeRequestApprovals.configuration(
         this.gitlabProjectId,
         {
-          mergerequestIId: pullRequestIid,
+          mergerequestIid: mergeRequestIid,
         },
       );
-
-      if (approvals.rules[0]) {
-        return approvals.rules[0].approved_by.map(user => user.username);
+      if (approvals.approved_by) {
+        return approvals.approved_by.map(user => user.user.username);
       }
       
-      console.log(`No approvals found for GitLab merge request !${pullRequestIid}.`)
+      console.log(`No approvals found for GitLab merge request !${mergeRequestIid}.`)
     } catch (err) {
       console.error(
-        `Could not fetch approvals for GitLab merge request !${pullRequestIid}: ${err}`
+        `Could not fetch approvals for GitLab merge request !${mergeRequestIid}: ${err}`
       );
+      throw err;
     }
     return [];
   }
