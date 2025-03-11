@@ -36,6 +36,7 @@ interface IssueImport {
   assignee?: string;
   created_at?: string;
   updated_at?: string;
+  closed_at?: string;
   milestone?: number;
   labels?: string[];
 }
@@ -461,6 +462,10 @@ export class GithubHelper {
       updated_at: issue.updated_at,
       closed: issue.state === 'closed',
     };
+
+    if (issue.state === 'closed') {
+      props.closed_at = issue.closed_at;
+    }
 
     let assignees = this.convertAssignees(issue);
     props.assignee = assignees.length == 1 ? assignees[0] : undefined;
