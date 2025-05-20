@@ -428,7 +428,13 @@ export class GithubHelper {
       labels.push('has attachment');
     }
 
-    labels.push('gitlab merge request');
+    // Differentiate between issue and merge request
+    // Note that it needs to apply to placeholders as well
+    if ('merge_requests_count' in item) {
+      labels.push('gitlab issue');
+    } else {
+      labels.push('gitlab merge request');
+    }
 
     if (item.state === 'merged') {
       labels.push('merged');
