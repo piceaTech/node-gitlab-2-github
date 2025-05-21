@@ -133,7 +133,8 @@ export class GitlabHelper {
       ).data;
       return Buffer.from(data, 'binary');
     } catch (err) {
-      console.error(`Could not download attachment #${relurl}: ${err.response.statusText}`);
+      console.error(`Could not download attachment ${relurl}: ${err.response.statusText}`);
+      console.error('Is your session cookie still valid?');
       return null;
     }
   }
