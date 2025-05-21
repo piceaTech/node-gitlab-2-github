@@ -6,7 +6,7 @@
 #
 # If you're interested in testing other base images, take a look at this reference:
 # https://github.com/BretFisher/nodejs-rocks-in-docker
-FROM node:16-bullseye-slim
+FROM node:22-bullseye-slim
 
 ARG USERNAME=migrator
 ARG USER_UID=2000
