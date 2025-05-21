@@ -1,5 +1,7 @@
 import { Gitlab } from '@gitbeaker/node';
 import {
+  DiscussionNote,
+  DiscussionSchema,
   IssueSchema,
   MergeRequestSchema,
   MilestoneSchema,
@@ -9,6 +11,8 @@ import {
 import { GitlabSettings } from './settings';
 import axios from 'axios';
 
+export type GitLabDiscussion = DiscussionSchema;
+export type GitLabDiscussionNote = DiscussionNote;
 export type GitLabIssue = IssueSchema;
 export type GitLabNote = NoteSchema;
 export type GitLabUser = Omit<UserSchema, 'created_at'>;
@@ -152,6 +156,24 @@ export class GitlabHelper {
   async getAllMergeRequestNotes(pullRequestIid: number): Promise<GitLabNote[]> {
     try {
       return this.gitlabApi.MergeRequestNotes.all(
+        this.gitlabProjectId,
+        pullRequestIid,
+        {}
+      );
+    } catch (err) {
+      console.error(
+        `Could not fetch notes for GitLab merge request #${pullRequestIid}.`
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Gets all notes for a given merge request.
+   */
+  async getAllMergeRequestDiscussions(pullRequestIid: number): Promise<GitLabDiscussion[]> {
+    try {
+      return this.gitlabApi.MergeRequestDiscussions.all(
         this.gitlabProjectId,
         pullRequestIid,
         {}
