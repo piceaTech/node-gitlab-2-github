@@ -27,7 +27,7 @@
   "homepage": "https://github.com/piceaTech/node-gitlab-2-github#readme",
   "dependencies": {
     "@gitbeaker/node": "^35.1.0",
-    "@octokit/plugin-throttling": "^3.5.2",
+    "@octokit/plugin-throttling": "^11.0.1",
     "@octokit/rest": "^21.1.1",
     "@octokit/types": "^6.34.0",
     "aws-sdk": "^2.1053.0",
