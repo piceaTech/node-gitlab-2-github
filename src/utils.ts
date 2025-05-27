@@ -1,4 +1,5 @@
 import { S3Settings } from './settings';
+import settings from '../settings';
 import * as mime from 'mime-types';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -97,3 +98,22 @@ export const migrateAttachments = async (
     ({}, {}, {}, {}, offset, {}) => offsetToAttachment[offset]
   );
 };
+
+export const organizationUsersString = (users: string[], prefix: string): string => {
+  let organizationUsers = [];
+  for (let assignee of users) {
+    let githubUser = settings.usermap[assignee as string];
+    if (githubUser) {
+      githubUser = '@' + githubUser;
+    } else {
+      githubUser = assignee as string;
+    }
+    organizationUsers.push(githubUser);
+  }
+
+  if (organizationUsers.length > 0) {
+    return `\n\n**${prefix}:** ` + organizationUsers.join(', ');
+  }
+
+  return '';
+}

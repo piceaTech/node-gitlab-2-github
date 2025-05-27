@@ -22,7 +22,7 @@ export default {
     accessKeyId: '{{accessKeyId}}',
     secretAccessKey: '{{secretAccessKey}}',
     bucket: 'my-gitlab-bucket',
-    region: null,
+    region: 'us-west-1',
   },
   usermap: {
     'username.gitlab.1': 'username.github.1',
@@ -34,6 +34,7 @@ export default {
   },
   conversion: {
     useLowerCaseLabels: true,
+    addIssueInformation: true,
   },
   transfer: {
     description: true,
