@@ -68,21 +68,21 @@ const githubApi = new MyOctokit({
   },
   auth: 'token ' + settings.github.token,
   throttle: {
-    onRateLimit: async (retryAfter, options) => {
+    onRateLimit: async (retryAfter, options, octokit, retryCount) => {
       console.log(
         `Request quota exhausted for request ${options.method} ${options.url}`
       );
       console.log(`Retrying after ${retryAfter} seconds!`);
       return true;
     },
-    onAbuseLimit: async (retryAfter, options) => {
+    onSecondaryRateLimit: async (retryAfter, options, octokit, retryCount) => {
       console.log(
-        `Abuse detected for request ${options.method} ${options.url}`
-      );
+        `SecondaryRateLimit detected for request ${options.method} ${options.url}`
+      )
       console.log(`Retrying after ${retryAfter} seconds!`);
       return true;
     },
-    minimumAbuseRetryAfter: 1000,
+    fallbackSecondaryRateRetryAfter: 600,
   },
 });
 
