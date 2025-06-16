@@ -4,7 +4,7 @@ import {
   SimpleLabel,
   SimpleMilestone,
 } from './githubHelper';
-import { GitlabHelper, GitLabIssue, GitLabMilestone } from './gitlabHelper';
+import { GitlabHelper, GitLabIssue, GitLabMergeRequest, GitLabMilestone } from './gitlabHelper';
 import settings from '../settings';
 
 import { Octokit as GitHubApi } from '@octokit/rest';
@@ -151,6 +151,23 @@ function createPlaceholderIssue(expectedIdx: number): Partial<GitLabIssue> {
     title: `[PLACEHOLDER] - for issue #${expectedIdx}`,
     description:
       'This is to ensure that issue numbers in GitLab and GitHub are the same',
+    state: 'closed',
+    isPlaceholder: true,
+  };
+}
+
+/**
+ * Creates dummy data for a placeholder issue
+ *
+ * @param expectedIdx Number of the GitLab issue
+ * @returns Data for the issue
+ */
+function createPlaceholderMergeRequest(expectedIdx: number): Partial<GitLabMergeRequest> {
+  return {
+    iid: expectedIdx,
+    title: `[PLACEHOLDER] - for merge request #${expectedIdx}`,
+    description:
+      'This is to ensure that merge request numbers in GitLab and GitHub are the same',
     state: 'closed',
     isPlaceholder: true,
   };
@@ -549,6 +566,25 @@ async function transferMergeRequests() {
   // Issues are sometimes created from Gitlab merge requests. Avoid creating duplicates.
   let githubIssues = await githubHelper.getAllGithubIssues();
 
+  if (settings.usePlaceholderIssuesForMissingMergeRequests) {
+    for (let i = 0; i < mergeRequests.length; i++) {
+      // GitLab issue internal Id (iid)
+      let expectedIdx = i + 1;
+
+      // is there a gap in the GitLab merge requests?
+      // Create placeholder issues so that new GitHub issues will have the same
+      // issue number as in GitLab. If a placeholder is used it is because there
+      // was a gap in GitLab merge requests -- likely caused by a deleted GitLab merge request.
+      if (mergeRequests[i].iid !== expectedIdx) {
+        mergeRequests.splice(i, 0, createPlaceholderMergeRequest(expectedIdx) as GitLabMergeRequest); // HACK: remove type coercion
+        counters.nrOfPlaceholderIssues++;
+        console.log(
+          `Added placeholder issue for GitLab merge request #${expectedIdx}.`
+        );
+      }
+    }
+  }
+
   console.log(
     'Transferring ' + mergeRequests.length.toString() + ' merge requests'
   );
@@ -568,11 +604,17 @@ async function transferMergeRequests() {
     let githubIssue = githubIssues.find(
       // allow for issues titled "Original Issue Name - [merged|closed]"
       i => {
-        // regex needs escaping in case merge request title contains special characters
-        const regex = new RegExp(escapeRegExp(mr.title.trim()) + ' - \\[(merged|closed)\\]');
-        return regex.test(i.title.trim()) && i.body.includes(mr.web_url);
+        if (!mr.isPlaceholder) {
+          // regex needs escaping in case merge request title contains special characters
+          const regex = new RegExp(escapeRegExp(mr.title.trim()) + ' - \\[(merged|closed)\\]');
+          return regex.test(i.title.trim()) && i.body.includes(mr.web_url);
+        }
+        else {
+          return i.title.trim() === mr.title.trim();
+        }
       }
     );
+
     if (!githubRequest && !githubIssue) {
       if (settings.skipMergeRequestStates.includes(mr.state)) {
         console.log(

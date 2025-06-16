@@ -206,7 +206,17 @@ Set to `true` (default) to enable using the [GitHub preview API for importing is
 
 ### usePlaceholderIssuesForMissingIssues
 
+NOTE: This setting requires `usePlaceholderIssuesForMissingMergeRequests` to be set to `false` (default).
+
 If this is set to `true` (default) then the migration process will automatically create empty dummy issues for every 'missing' GitLab issue (if you deleted a GitLab issue for example). Those issues will be closed on Github and they ensure that the issue ids stay the same on both GitLab and Github.
+
+### usePlaceholderIssuesForMissingMergeRequests
+
+NOTE: GitLab has distinct numbers for issues and merge requests whereas GitHub treats pull requests as issues.
+Only use this setting if your GitLab repository does not have issues or you do not intend on migrating them.
+This setting therefore requires `usePlaceholderIssuesForMissingIssues` to be set to `false`.
+
+If this is set to `true` then the migration process will automatically create empty dummy issues for every 'missing' GitLab merge request (if you deleted a GitLab merge request for example). Those issues will be closed on Github and they ensure that the issue ids stay the same on both GitLab and Github.
 
 #### usePlaceholderMilestonesForMissingMilestones
 
