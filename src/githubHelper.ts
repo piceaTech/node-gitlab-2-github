@@ -78,6 +78,7 @@ export class GithubHelper {
   useIssuesForAllMergeRequests: boolean;
   milestoneMap?: Map<number, SimpleMilestone>;
   users: Set<string>;
+  members: Set<string>;
 
   constructor(
     githubApi: GitHubApi,
@@ -99,6 +100,19 @@ export class GithubHelper {
     this.delayInMs = 2000;
     this.useIssuesForAllMergeRequests = useIssuesForAllMergeRequests;
     this.users = new Set<string>();
+
+    this.members = new Set<string>();
+
+    // TODO: won't work if ownerIsOrg is false
+    githubApi.orgs.listMembers(  {
+      org: this.githubOwner,
+    }).then(members => {
+      for (let member of members.data) {
+        this.members.add(member.login);
+      }
+    }).catch(err => {
+      console.error(`Failed to fetch organization members: ${err}`);
+    });
   }
 
   /*
@@ -381,9 +395,16 @@ export class GithubHelper {
       if (username === settings.github.username) {
         assignees.push(settings.github.username);
       } else if (settings.usermap && settings.usermap[username]) {
-        assignees.push(settings.usermap[username]);
+        let gitHubUsername = settings.usermap[username];
+        if (this.members.has(gitHubUsername)) {
+          assignees.push(gitHubUsername);
+        }
+        else {
+          console.log(`Cannot assign assignee: User ${gitHubUsername} is not a member of ${this.githubOwner}`);
+        }
       }
     }
+
     return assignees;
   }
 
@@ -1360,7 +1381,7 @@ export class GithubHelper {
       return Promise.resolve();
     }
 
-    // Use the Issues API; all pull requests are issues, and we're not modifying any pull request-sepecific fields. This
+    // Use the Issues API; all pull requests are issues, and we're not modifying any pull request-specific fields. This
     // then works for merge requests that cannot be created and are migrated as issues.
     return await this.githubApi.issues.update(props);
   }
