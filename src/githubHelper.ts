@@ -1088,6 +1088,67 @@ export class GithubHelper {
   // ----------------------------------------------------------------------------
 
   /**
+   * Creates the information required for a new review comment.
+   * See: https://docs.github.com/en/rest/pulls/comments?apiVersion=2022-11-28#create-a-review-comment-for-a-pull-request
+   */
+  static createReviewCommentInformation(position, repoLink: string): object {
+    if (
+      !repoLink ||
+      !repoLink.startsWith(gitHubLocation) ||
+      !position ||
+      !position.head_sha ||
+      !position.line_range
+    ) {
+      throw new Error(`Position is invalid: ${JSON.stringify(position)}`);
+    }
+
+    let head_sha = position.head_sha;
+    let side = '';
+    let path = '';
+
+    if (
+      (position.new_line && position.new_path) ||
+      (position.old_line && position.old_path)
+    ) {
+      if (!position.old_line || !position.old_path) {
+        side = 'RIGHT';
+        path = position.new_path;
+      } else {
+        side = 'LEFT';
+        path = position.old_path;
+        // use the start_sha since the head_sha does not contain the line anymore
+        // head_sha = position.start_sha;
+      }
+    }
+
+    // figure out new commit
+    const cherry_picked_commit = settings.commitMap[head_sha];
+    if (cherry_picked_commit) {
+      head_sha = cherry_picked_commit;
+    }
+
+    const start = position.line_range.start;
+    const end = position.line_range.end;
+    const start_line = start.type === 'new' ? start.new_line : start.old_line;
+    const end_line = end.type === 'new' ? end.new_line : end.old_line;
+
+    let data = {
+      commit_id: head_sha,
+      path: path,
+      side: side,
+      line: end_line,
+    };
+
+    // deal with multi-line comments
+    if (start_line != end_line) {
+      data['start_line'] = start_line;
+      data['start_side'] = side;
+    }
+
+    return data;
+  }
+
+  /**
    * Create comments for the pull request
    * @param pullRequest the GitHub pull request object
    * @param mergeRequest the GitLab merge request object
@@ -1097,6 +1158,7 @@ export class GithubHelper {
     mergeRequest: GitLabMergeRequest
   ): Promise<void> {
     console.log('\tMigrating pull request comments...');
+    const repoLink = `${this.githubUrl}/${this.githubOwner}/${this.githubRepo}`;
 
     if (!mergeRequest.iid) {
       console.log(
@@ -1108,7 +1170,7 @@ export class GithubHelper {
     let discussions = await this.gitlabHelper.getAllMergeRequestDiscussions(
       mergeRequest.iid
     );
-
+    
     // if there are no notes, then there is nothing to do!
     if (discussions.length === 0) {
       console.log(
@@ -1116,7 +1178,6 @@ export class GithubHelper {
       );
       return;
     }
-
     // Sort notes in ascending order of when they were created (by id)
     discussions = discussions.sort((a, b) => a.notes[0].id - b.notes[0].id);
 
@@ -1135,13 +1196,22 @@ export class GithubHelper {
       else {
         // console.log('Processing discussion:');
         let discussionBody = '**Discussion in GitLab:**\n\n';
-        
+        let reviewComments = [];
+
         for (let note of discussion.notes) {
           if (this.checkIfNoteCanBeSkipped(note.body)) {
             nrOfSkippedNotes++;
             continue;
           }
 
+          if (note.type === 'DiffNote') {
+            reviewComments.push({
+              body: await this.convertIssuesAndComments(note.body, note, true, false),
+              ...GithubHelper.createReviewCommentInformation(note.position, repoLink),
+            });
+          } 
+          
+          // create regular comment either way, in case the review comment cannot be created
           const add_line_ref = discussion.notes.indexOf(note) === 0;
           let bodyConverted = await this.convertIssuesAndComments(note.body, note, true, add_line_ref);
           discussionBody += bodyConverted;
@@ -1152,18 +1222,69 @@ export class GithubHelper {
         await utils.sleep(this.delayInMs);
 
         if (!settings.dryRun) {
-          await this.githubApi.issues
-            .createComment({
+          let create_regular_comment = true;
+          if (reviewComments.length > 0) {
+            create_regular_comment = false;
+            const first_comment = reviewComments[0];
+            
+            let new_review_comment = await this.githubApi.pulls.createReviewComment({
               owner: this.githubOwner,
               repo: this.githubRepo,
-              issue_number: pullRequest.number,
-              body: discussionBody,
-            })
-            .catch(x => {
-              console.error('could not create GitHub issue comment!');
-              console.error(x);
-              process.exit(1);
+              pull_number: pullRequest.number,
+              ...first_comment,
+            }).catch(x => {
+              let use_fallback = false;
+              if (x.status === 422) {
+                if (x.response.data.message === 'Validation Failed') {
+                  let validation_error = x.response.data.errors[0];
+                  if (validation_error.message.endsWith(' is not part of the pull request')) {
+                    // fall back to creating a regular comment for the discussion
+                    create_regular_comment = true;
+                    use_fallback = true;
+                    console.log('fallback to regular comment');
+                  }
+                }
+              }
+
+              if (!use_fallback) {
+                console.error('could not create GitHub pull request review comment!');
+                console.error(x);
+                process.exit(1);
+              }
             });
+
+            if (!create_regular_comment) {
+              for (let reviewComment of reviewComments.slice(1)) {
+                // await utils.sleep(this.delayInMs);
+                this.githubApi.pulls.createReplyForReviewComment({
+                  owner: this.githubOwner,
+                  repo: this.githubRepo,
+                  pull_number: pullRequest.number,
+                  comment_id: (new_review_comment as {data: {id: number}}).data.id,
+                  body: reviewComment.body,
+                }).catch(x => {
+                  console.error('could not create GitHub reply for pull request review comment!');
+                  console.error(x);
+                  process.exit(1);
+                });
+              }
+            }
+          }
+
+          if (create_regular_comment) {
+            await this.githubApi.issues
+              .createComment({
+                owner: this.githubOwner,
+                repo: this.githubRepo,
+                issue_number: pullRequest.number,
+                body: discussionBody,
+              })
+              .catch(x => {
+                console.error('could not create GitHub issue comment!');
+                console.error(x);
+                process.exit(1);
+              });
+            }
         }
       }
     }
