@@ -181,7 +181,8 @@ export class GithubHelper {
         owner: this.githubOwner,
         repo: this.githubRepo,
         state: 'all',
-        labels: 'gitlab merge request',
+        // Remove label filter to get ALL issues for proper duplicate detection
+        // labels: 'gitlab merge request',
         per_page: perPage,
         page: page,
       });
@@ -496,7 +497,7 @@ export class GithubHelper {
       closed: issue.state === 'closed',
     };
 
-    if (issue.state === 'closed') {
+    if (issue.state === 'closed' && issue.closed_at) {
       props.closed_at = issue.closed_at;
     }
 

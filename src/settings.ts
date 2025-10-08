@@ -34,6 +34,9 @@ export default interface Settings {
     logFile: string;
     log: boolean;
   };
+  commitMap?: {
+    [key: string]: string;
+  };
   s3?: S3Settings;
 }
 
