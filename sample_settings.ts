@@ -32,6 +32,10 @@ export default {
     'gitlabgroup/projectname.1': 'GitHubOrg/projectname.1',
     'gitlabgroup/projectname.2': 'GitHubOrg/projectname.2',
   },
+  commitMap: {
+    'gitlab-commit-hash-1': 'github-commit-hash-1',
+    'gitlab-commit-hash-2': 'github-commit-hash-2',
+  },
   conversion: {
     useLowerCaseLabels: true,
     addIssueInformation: true,
