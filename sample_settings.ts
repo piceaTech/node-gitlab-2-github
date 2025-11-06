@@ -53,6 +53,7 @@ export default {
   useIssueImportAPI: true,
   usePlaceholderMilestonesForMissingMilestones: true,
   usePlaceholderIssuesForMissingIssues: true,
+  usePlaceholderIssuesForMissingMergeRequests: false,
   useReplacementIssuesForCreationFails: true,
   useIssuesForAllMergeRequests: false,
   filterByLabel: undefined,
