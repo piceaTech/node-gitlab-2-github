@@ -862,7 +862,7 @@ export class GithubHelper {
   async createMilestone(milestone: MilestoneImport): Promise<SimpleMilestone> {
     // convert from GitLab to GitHub
     let bodyConverted = await this.convertIssuesAndComments(
-      milestone.description,
+      milestone.description || '',
       milestone,
       false
     );
