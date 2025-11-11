@@ -38,9 +38,7 @@ export default interface Settings {
     [key: string]: string;
   };
   s3?: S3Settings;
-  commitMap: {
-    [key: string]: string;
-  };
+  azure?: AzureBlobSettings;
 }
 
 export interface GithubSettings {
@@ -69,4 +67,14 @@ export interface S3Settings {
   secretAccessKey: string;
   bucket: string;
   region: string;
+}
+
+export interface AzureBlobSettings {
+  // Either provide connectionString, or accountName+accountKey
+  connectionString?: string;
+  accountName?: string;
+  accountKey?: string;
+  container: string;
+  // optional: override base URL if using sovereign clouds/custom domain
+  endpoint?: string; // e.g. https://<acct>.blob.core.windows.net
 }
