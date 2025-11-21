@@ -147,15 +147,31 @@ export class GithubHelper {
    */
   async getAllGithubMilestones(): Promise<SimpleMilestone[]> {
     try {
+      let allMilestones: SimpleMilestone[] = [];
+      let page = 1;
+      const perPage = 100;
+
+      while (true) {
       await utils.sleep(this.delayInMs);
-      // get an array of GitHub milestones for the new repo
-      let result = await this.githubApi.issues.listMilestones({
+        const result = await this.githubApi.issues.listMilestones({
         owner: this.githubOwner,
         repo: this.githubRepo,
         state: 'all',
-      });
+          per_page: perPage,
+          page,
+        });
 
-      return result.data.map(x => ({ number: x.number, title: x.title }));
+        if (result.data.length === 0) break;
+
+        allMilestones = allMilestones.concat(
+          result.data.map(x => ({ number: x.number, title: x.title })),
+        );
+
+        if (result.data.length < perPage) break;
+        page++;
+      }
+
+      return allMilestones;
     } catch (err) {
       console.error('Could not access all GitHub milestones');
       console.error(err);
