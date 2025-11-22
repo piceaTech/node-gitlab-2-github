@@ -152,11 +152,11 @@ export class GithubHelper {
       const perPage = 100;
 
       while (true) {
-      await utils.sleep(this.delayInMs);
+        await utils.sleep(this.delayInMs);
         const result = await this.githubApi.issues.listMilestones({
-        owner: this.githubOwner,
-        repo: this.githubRepo,
-        state: 'all',
+          owner: this.githubOwner,
+          repo: this.githubRepo,
+          state: 'all',
           per_page: perPage,
           page,
         });
