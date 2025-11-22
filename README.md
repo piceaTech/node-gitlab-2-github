@@ -148,6 +148,30 @@ Existing bucket, with an appropriate security policy. One possible policy is to 
 
 Specify Region (example: us-west-1) of bucket [list of regions](https://docs.aws.amazon.com/general/latest/gr/s3.html)
 
+### azure (optional, alternative to s3)
+
+Azure Blob Storage as an alternative to s3 can be used to store attachments from issues. If omitted, `has attachment` label will be added to GitHub issue.
+
+#### azure.accountName
+
+Azure account name. Can be skipped when `azure.connectionString` is provided.
+
+#### azure.accountKey
+
+Azure account key. Can be skipped when `azure.connectionString` is provided.
+
+#### azure.container
+
+Azure Blob Storage container name. Can be skipped when `azure.connectionString` is provided.
+
+#### azure.endpoint
+
+URL to override the default endpoint. Default value `https://myaccount.blob.core.windows.net`.
+
+#### azure.connectionString
+
+Full connection string that contains accountName, accountKey, container and endpoint. Can be used to define connection paramters in one place.
+
 ### usermap
 
 Maps the usernames from gitlab to github. If the assinee of the gitlab issue is equal to the one currently logged in github it will also get assigned without a usermap. The Mentions in issues will also be translated to the new github name.
