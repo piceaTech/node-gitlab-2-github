@@ -9,6 +9,12 @@ export default interface Settings {
   projectmap: {
     [key: string]: string;
   };
+  csvImport?:{
+    projectMapCsv?: string;
+    gitlabProjectIdColumn?: number;
+    gitlabProjectPathColumn?: number;
+    githubProjectPathColumn?: number;
+    }
   conversion: {
     useLowerCaseLabels: boolean;
     addIssueInformation: boolean;

@@ -103,16 +103,17 @@ export class GithubHelper {
 
     this.members = new Set<string>();
 
-    // TODO: won't work if ownerIsOrg is false
-    githubApi.orgs.listMembers(  {
-      org: this.githubOwner,
-    }).then(members => {
-      for (let member of members.data) {
-        this.members.add(member.login);
-      }
-    }).catch(err => {
-      console.error(`Failed to fetch organization members: ${err}`);
-    });
+    if (this.githubOwnerIsOrg) {
+      githubApi.orgs.listMembers(  {
+        org: this.githubOwner,
+      }).then(members => {
+        for (let member of members.data) {
+          this.members.add(member.login);
+        }
+      }).catch(err => {
+        console.error(`Failed to fetch organization members: ${err}`);
+      });
+    }
   }
 
   /*

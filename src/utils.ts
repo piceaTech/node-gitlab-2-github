@@ -3,11 +3,86 @@ import settings from '../settings';
 import * as mime from 'mime-types';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
 import S3 from 'aws-sdk/clients/s3';
 import { GitlabHelper } from './gitlabHelper';
 
 export const sleep = (milliseconds: number) => {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
+};
+
+export const readProjectsFromCsv = (
+  filePath: string,
+  idColumn: number = 0,
+  gitlabPathColumn: number = 1,
+  githubPathColumn: number = 2
+): Map<number, [string, string]> => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`CSV file not found: ${filePath}`);
+    }
+
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split(/\r?\n/);
+    const projectMap = new Map<number, [string, string]>();
+    let headerSkipped = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      if (!line || line.startsWith('#')) {
+        continue;
+      }
+
+      const values = line.split(',').map(v => v.trim());
+      const maxColumn = Math.max(idColumn, gitlabPathColumn, githubPathColumn);
+      
+      if (maxColumn >= values.length) {
+        console.warn(`Warning: Line ${i + 1} has only ${values.length} column(s), skipping (need column ${maxColumn})`);
+        if (!headerSkipped) {
+          headerSkipped = true;
+        }
+        continue;
+      }
+
+      const idStr = values[idColumn];
+      const gitlabPath = values[gitlabPathColumn];
+      const githubPath = values[githubPathColumn];
+
+      if (!headerSkipped) {
+        const num = parseInt(idStr, 10);
+        if (isNaN(num) || idStr.toLowerCase().includes('id') || idStr.toLowerCase().includes('project')) {
+          console.log(`Skipping CSV header row: "${line}"`);
+          headerSkipped = true;
+          continue;
+        }
+        headerSkipped = true;
+      }
+
+      if (!idStr || !gitlabPath || !githubPath) {
+        console.warn(`Warning: Line ${i + 1} has empty values, skipping`);
+        continue;
+      }
+
+      const projectId = parseInt(idStr, 10);
+      if (isNaN(projectId)) {
+        console.warn(`Warning: Line ${i + 1}: Invalid project ID "${idStr}", skipping`);
+        continue;
+      }
+
+      projectMap.set(projectId, [gitlabPath, githubPath]);
+    }
+
+    if (projectMap.size === 0) {
+          throw new Error(`No valid project mappings found in CSV file: ${filePath}`);
+        }
+    
+        console.log(`✓ Loaded ${projectMap.size} project mappings from CSV`);
+        return projectMap;
+      } catch (err) {
+        console.error(`Error reading project mapping CSV file: ${err.message}`);
+        throw err;
+  }
 };
 
 // Creates new attachments and replaces old links
