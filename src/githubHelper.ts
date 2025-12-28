@@ -1681,16 +1681,22 @@ export class GithubHelper {
     ) {
       return '';
     }
+
     const base_sha = position.base_sha;
-    let head_sha = position.head_sha;
+    const head_sha = position.head_sha;
+
     var path = '';
     var line = '';
     var slug = '';
+    var ref = '';
+
+    const crypto = require('crypto');
+
     if (
       (position.new_line && position.new_path) ||
       (position.old_line && position.old_path)
     ) {
-      var side;
+      var side = '';
       if (!position.old_line || !position.old_path) {
         side = 'R';
         path = position.new_path;
@@ -1700,25 +1706,33 @@ export class GithubHelper {
         path = position.old_path;
         line = position.old_line;
       }
-      const crypto = require('crypto');
       const hash = crypto.createHash('sha256').update(path).digest('hex');
       slug = `#diff-${hash}${side}${line}`;
+      ref = `${path} line ${line}`;
+    } else if (position.old_path) {
+      path = position.old_path;
+      const hash = crypto.createHash('sha256').update(path).digest('hex');
+      slug = `#diff-${hash}`;
+      ref = path;
+    } else {
+      ref = head_sha;
     }
-    // Mention the file and line number. If we can't get this for some reason then use the commit id instead.
-    const ref = path && line ? `${path} line ${line}` : `${head_sha}`;
+
     let lineRef = `Commented on [${ref}](${repoLink}/compare/${base_sha}..${head_sha}${slug})\n\n`;
 
-    if (position.line_range.start.type === 'new') {
-      const startLine = position.line_range.start.new_line;
-      const endLine = position.line_range.end.new_line;
-      const lineRange = (startLine !== endLine) ? `L${startLine}-L${endLine}` : `L${startLine}`;
-      lineRef += `${repoLink}/blob/${head_sha}/${path}#${lineRange}\n\n`;
-    }
-    else {
-      const startLine = position.line_range.start.old_line;
-      const endLine = position.line_range.end.old_line;
-      const lineRange = (startLine !== endLine) ? `L${startLine}-L${endLine}` : `L${startLine}`;
-      lineRef += `${repoLink}/blob/${head_sha}/${path}#${lineRange}\n\n`;
+    if (position.line_range) {
+      if (position.line_range.start.type === 'new') {
+        const startLine = position.line_range.start.new_line;
+        const endLine = position.line_range.end.new_line;
+        const lineRange = (startLine !== endLine) ? `L${startLine}-L${endLine}` : `L${startLine}`;
+        lineRef += `${repoLink}/blob/${head_sha}/${path}#${lineRange}\n\n`;
+      }
+      else {
+        const startLine = position.line_range.start.old_line;
+        const endLine = position.line_range.end.old_line;
+        const lineRange = (startLine !== endLine) ? `L${startLine}-L${endLine}` : `L${startLine}`;
+        lineRef += `${repoLink}/blob/${head_sha}/${path}#${lineRange}\n\n`;
+      }
     }
 
     return lineRef;
