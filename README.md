@@ -82,7 +82,8 @@ Go to [Settings / Access Tokens](https://gitlab.com/-/profile/personal_access_to
 
 #### gitlab.projectID
 
-Leave it null for the first run of the script. Then the script will show you which projects there are. Can be either string or number.
+Leave it null for the first run of the script (leave csvImport.projectMapCsv empty either). Then the script will show you which projects there are. Can be either string or number.
+Leave it null if you want to import multiple projects via csv file (set `csvImport` instead).
 
 #### gitlab.listArchivedProjects
 
@@ -155,6 +156,23 @@ Maps the usernames from gitlab to github. If the assinee of the gitlab issue is 
 ### projectmap
 
 When one renames the project while transfering so that the projects don't loose there links to the mentioned issues.
+
+### csvImport.projectMapCsv
+
+Optional name of CSV file (located in project root) containing multiple projects for migration. If set, it overrules `gitlab.projectId` and `github.repo`.
+CSV file must contain the following values: GitLab project ID, GitLab project path, GitHub project path, e.g. 213,gitlab_namespace/gitlab_projectname,github_namespace/github_projectname
+
+### csvImport.gitlabProjectIdColumn
+
+Column in CSV file containing GitLab project ID
+
+### csvImport.gitlabProjectPathColumn
+
+Column in CSV file containing GitLab path
+
+### csvImport.githubProjectPathColumn
+
+Column in CSV file containing GitHub path
 
 ### conversion
 
