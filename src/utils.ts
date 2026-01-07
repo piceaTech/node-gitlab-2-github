@@ -1,9 +1,9 @@
-import { S3Settings } from './settings';
 import settings from '../settings';
 import * as mime from 'mime-types';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import S3 from 'aws-sdk/clients/s3';
+import { BlobServiceClient, StorageSharedKeyCredential } from '@azure/storage-blob';
 import { GitlabHelper } from './gitlabHelper';
 
 export const sleep = (milliseconds: number) => {
@@ -14,7 +14,6 @@ export const sleep = (milliseconds: number) => {
 export const migrateAttachments = async (
   body: string,
   githubRepoId: number | undefined,
-  s3: S3Settings | undefined,
   gitlabHelper: GitlabHelper
 ) => {
   const regexp = /(!?)\[([^\]]+)\]\((\/uploads[^)]+)\)/g;
@@ -32,6 +31,8 @@ export const migrateAttachments = async (
     const name = match[2];
     const url = match[3];
 
+    const s3 = settings.s3;
+    const azure = settings.azure;
     if (s3 && s3.bucket) {
       const basename = path.basename(url);
       const mimeType = mime.lookup(basename);
@@ -81,6 +82,56 @@ export const migrateAttachments = async (
       offsetToAttachment[
         match.index as number
       ] = `${prefix}[${name}](${s3url})`;
+    } else if (azure && azure.container) {
+      const basename = path.basename(url);
+      const mimeType = mime.lookup(basename);
+      const attachmentBuffer = await gitlabHelper.getAttachment(url);
+      if (!attachmentBuffer) {
+        continue;
+      }
+
+      // Generate file name for Azure Blob from URL
+      const hash = crypto.createHash('sha256');
+      hash.update(url);
+      const newFileName = hash.digest('hex') + '/' + basename;
+      const relativePath = githubRepoId ? `${githubRepoId}/${newFileName}` : newFileName;
+
+      // Build BlobServiceClient
+      let blobServiceClient: BlobServiceClient;
+      if (azure.connectionString) {
+        blobServiceClient = BlobServiceClient.fromConnectionString(azure.connectionString);
+      } else if (azure.accountName && azure.accountKey) {
+        const endpoint = (azure.endpoint
+          ? azure.endpoint
+          : `https://${azure.accountName}.blob.core.windows.net`);
+        const cred = new StorageSharedKeyCredential(azure.accountName, azure.accountKey);
+        blobServiceClient = new BlobServiceClient(endpoint, cred);
+      } else {
+        console.log('Azure storage not configured (missing credentials). Skipping upload.');
+        continue;
+      }
+
+      const containerClient = blobServiceClient.getContainerClient(azure.container);
+      const blobClient = containerClient.getBlockBlobClient(relativePath);
+      const contentType = mimeType === false ? undefined : (mimeType as string);
+      const targetUrlBase = (azure.endpoint
+        ? `${azure.endpoint}`
+        : (azure.accountName ? `https://${azure.accountName}.blob.core.windows.net` : ''));
+      const blobUrl = `${targetUrlBase}/${azure.container}/${relativePath}`;
+
+      console.log(`\tUploading ${basename} to ${blobUrl}... `);
+      try {
+        await blobClient.uploadData(attachmentBuffer, {
+          blobHTTPHeaders: contentType ? { blobContentType: contentType } : undefined,
+        });
+        console.log(`\t...Done uploading`);
+      } catch (err) {
+        console.log('ERROR: ', err);
+      }
+
+      // Add the new URL to the map
+      offsetToAttachment[match.index as number] = `${prefix}[${name}](${blobUrl})`;
+
     } else {
       // Not using S3: default to old URL, adding absolute path
       const host = gitlabHelper.host.endsWith('/')

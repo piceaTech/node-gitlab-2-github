@@ -24,6 +24,15 @@ export default {
     bucket: 'my-gitlab-bucket',
     region: 'us-west-1',
   },
+  // Optional Azure Blob Storage for attachments (alternative to s3)
+  // Provide either `connectionString`, or `accountName` + `accountKey`
+  azure: {    
+    accountName: '{{myaccount}}',
+    accountKey: '{{accountKey}}',
+    container: 'my-gitlab-container',
+    // connectionString: 'DefaultEndpointsProtocol=...;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net',
+    // endpoint: 'https://myaccount.blob.core.windows.net' // optional override
+  },
   usermap: {
     'username.gitlab.1': 'username.github.1',
     'username.gitlab.2': 'username.github.2',
