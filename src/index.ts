@@ -6,6 +6,7 @@ import {
 } from './githubHelper';
 import { GitlabHelper, GitLabIssue, GitLabMilestone } from './gitlabHelper';
 import settings from '../settings';
+import { readProjectsFromCsv } from './utils';
 
 import { Octokit as GitHubApi } from '@octokit/rest';
 import { throttling } from '@octokit/plugin-throttling';
@@ -94,17 +95,69 @@ const githubHelper = new GithubHelper(
   settings.useIssuesForAllMergeRequests
 );
 
-// If no project id is given in settings.js, just return
-// all of the projects that this user is associated with.
-if (!settings.gitlab.projectId) {
-  gitlabHelper.listProjects();
-} else {
-  // user has chosen a project
-  if (settings.github.recreateRepo === true) {
-    recreate();
+let projectMap: Map<number, [string, string]> = new Map();
+
+if (settings.csvImport?.projectMapCsv) {
+  console.log(`Loading projects from CSV: ${settings.csvImport.projectMapCsv}`);
+  projectMap = readProjectsFromCsv(
+    settings.csvImport.projectMapCsv,
+    settings.csvImport.gitlabProjectIdColumn,
+    settings.csvImport.gitlabProjectPathColumn,
+    settings.csvImport.githubProjectPathColumn
+  ); 
+  } else {
+    projectMap.set(settings.gitlab.projectId, ['', '']);
   }
-  migrate();
-}
+
+(async () => {
+  if (projectMap.size === 0 || (projectMap.size === 1 && projectMap.has(0))) {
+    await gitlabHelper.listProjects();
+  } else {
+    for (const projectId of projectMap.keys()) {
+      const paths = projectMap.get(projectId);
+      
+      if (!paths) {
+        console.warn(`Warning: No paths found for project ID ${projectId}, skipping`);
+        continue;
+      }
+      
+      const [gitlabPath, githubPath] = paths;
+      
+      console.log(`\n\n${'='.repeat(60)}`);
+      if (gitlabPath) {
+        console.log(`Processing Project ID: ${projectId} ${gitlabPath} → GitHub: ${githubPath}`);
+      } else {
+        console.log(`Processing Project ID: ${projectId}`);
+      }
+      console.log(`${'='.repeat(60)}\n`);
+
+      settings.gitlab.projectId = projectId;
+      gitlabHelper.gitlabProjectId = projectId;
+      
+      if (githubPath) {
+        const githubParts = githubPath.split('/');
+        if (githubParts.length === 2) {
+          settings.github.owner = githubParts[0];
+          settings.github.repo = githubParts[1];
+          
+          githubHelper.githubOwner = githubParts[0];
+          githubHelper.githubRepo = githubParts[1];
+        } else {
+          settings.github.repo = githubPath;
+          githubHelper.githubRepo = githubPath;
+        }        
+      }
+      
+      if (settings.github.recreateRepo === true) {
+        await recreate();
+      }
+      await migrate();
+    }
+  }
+})().catch(err => {
+  console.error('Migration failed:', err);
+  process.exit(1);
+});
 
 // ----------------------------------------------------------------------------
 
