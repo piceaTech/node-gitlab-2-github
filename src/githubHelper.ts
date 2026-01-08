@@ -939,6 +939,15 @@ export class GithubHelper {
   async createPullRequestAndComments(
     mergeRequest: GitLabMergeRequest
   ): Promise<void> {
+    // Use the issue creation for placeholder issues
+    if (mergeRequest.isPlaceholder) {
+      let issue = mergeRequest as unknown;
+      await this.createIssueAndComments(issue as GitLabIssue);
+      console.log(`Created placeholder issue for placeholder merge request #${mergeRequest.iid}`);
+
+      return;
+    }
+
     let pullRequestData = await this.createPullRequest(mergeRequest);
 
     // createPullRequest() returns an issue number if a PR could not be created and

@@ -30,6 +30,7 @@ export default interface Settings {
   useIssueImportAPI: boolean;
   usePlaceholderMilestonesForMissingMilestones: boolean;
   usePlaceholderIssuesForMissingIssues: boolean;
+  usePlaceholderIssuesForMissingMergeRequests: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;
   filterByLabel?: string;
