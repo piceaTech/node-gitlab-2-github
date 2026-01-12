@@ -29,14 +29,14 @@ export const readProjectsFromCsv = (
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       if (!line || line.startsWith('#')) {
         continue;
       }
 
       const values = line.split(',').map(v => v.trim());
       const maxColumn = Math.max(idColumn, gitlabPathColumn, githubPathColumn);
-      
+
       if (maxColumn >= values.length) {
         console.warn(`Warning: Line ${i + 1} has only ${values.length} column(s), skipping (need column ${maxColumn})`);
         if (!headerSkipped) {
@@ -76,7 +76,7 @@ export const readProjectsFromCsv = (
     if (projectMap.size === 0) {
           throw new Error(`No valid project mappings found in CSV file: ${filePath}`);
         }
-    
+
         console.log(`✓ Loaded ${projectMap.size} project mappings from CSV`);
         return projectMap;
       } catch (err) {
@@ -191,4 +191,69 @@ export const organizationUsersString = (users: string[], prefix: string): string
   }
 
   return '';
+}
+
+export interface GitLabMetadata {
+  timeEstimate?: string;
+  timeSpent?: string;
+  weight?: number;
+  dueDate?: string;
+  healthStatus?: string;
+}
+
+const WEIGHT_LABEL_COLOR = 'D4C5F9'; // Light purple
+
+/**
+ * Extracts GitLab-specific metadata from an issue
+ */
+export function extractGitLabMetadata(issue: any): GitLabMetadata {
+  return {
+    timeEstimate: issue.time_stats?.human_time_estimate,
+    timeSpent: issue.time_stats?.human_total_time_spent,
+    weight: issue.weight,
+    dueDate: issue.due_date,
+    healthStatus: issue.health_status,
+  };
+}
+
+/**
+ * Formats GitLab metadata as a markdown section
+ * Returns empty string if no metadata exists
+ */
+export function formatGitLabMetadata(metadata: GitLabMetadata): string {
+  const hasAnyMetadata = metadata.timeEstimate || metadata.timeSpent || metadata.weight || metadata.dueDate || metadata.healthStatus;
+  if (!hasAnyMetadata) return '';
+
+  let result = '\n---\n**GitLab Metadata**\n\n';
+
+  if (metadata.timeEstimate) result += `- ⏱️ Time Estimate: ${metadata.timeEstimate}\n`;
+  if (metadata.timeSpent) result += `- ⏲️ Time Spent: ${metadata.timeSpent}\n`;
+  if (metadata.weight) result += `- ⚖️ Weight: ${metadata.weight}\n`;
+  if (metadata.dueDate) result += `- 📅 Due Date: ${metadata.dueDate}\n`;
+  if (metadata.healthStatus) result += `- 🏥 Health: ${metadata.healthStatus}\n`;
+
+  result += '---\n';
+  return result;
+}
+
+/**
+ * Ensures a weight label exists in the GitHub repository
+ * Silently ignores if label already exists
+ */
+export async function ensureWeightLabel(octokit: any, owner: string, repo: string, weight: number): Promise<void> {
+  try {
+    await octokit.rest.issues.createLabel({
+      owner,
+      repo,
+      name: `weight::${weight}`,
+      color: WEIGHT_LABEL_COLOR,
+      description: `GitLab issue weight: ${weight}`,
+    });
+  } catch (error) {
+    if ((error as any).status === 422) {
+      // Label already exists, this is expected
+      return;
+    }
+    console.warn(`Warning: Could not create label weight::${weight}:`, (error as any).message);
+  }
 }

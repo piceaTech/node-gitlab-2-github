@@ -383,6 +383,11 @@ export class GithubHelper {
       true,
     );
 
+    // Enrich with GitLab metadata if enabled and not a placeholder
+    if (!issue.isPlaceholder) {
+      bodyConverted = this.enrichBodyWithMetadata(issue, bodyConverted);
+    }
+
     let props: RestEndpointMethodTypes['issues']['create']['parameters'] = {
       owner: this.githubOwner,
       repo: this.githubRepo,
@@ -392,7 +397,13 @@ export class GithubHelper {
 
     props.assignees = this.convertAssignees(issue);
     props.milestone = this.convertMilestone(issue);
-    props.labels = this.convertLabels(issue);
+
+    let labels = this.convertLabels(issue);
+    // Add weight label if enabled and not a placeholder
+    if (!issue.isPlaceholder) {
+      await this.addWeightLabel(issue, labels);
+    }
+    props.labels = labels;
 
     await utils.sleep(this.delayInMs);
 
@@ -488,6 +499,48 @@ export class GithubHelper {
   }
 
   /**
+   * Enriches issue body with GitLab metadata (time tracking, weight, due date, health status)
+   * if enrichGitLabMetadata is enabled in settings
+   */
+  enrichBodyWithMetadata(issue: GitLabIssue, body: string): string {
+    if (!settings.conversion.enrichGitLabMetadata) {
+      return body;
+    }
+
+    const metadata = utils.extractGitLabMetadata(issue);
+    const metadataSection = utils.formatGitLabMetadata(metadata);
+
+    if (!metadataSection) {
+      return body;
+    }
+
+    // Insert metadata before the footer "Migrated from" if it exists
+    const footerIndex = body.lastIndexOf('*Migrated from');
+    if (footerIndex !== -1) {
+      return body.slice(0, footerIndex) + metadataSection + body.slice(footerIndex);
+    }
+
+    return body + metadataSection;
+  }
+
+  /**
+   * Adds weight label to labels array if createWeightLabels is enabled
+   * and ensures the label exists in the repository
+   */
+  async addWeightLabel(issue: GitLabIssue, labels: string[]): Promise<void> {
+    if (!settings.conversion.createWeightLabels || !issue.weight) {
+      return;
+    }
+
+    const weightLabel = `weight::${issue.weight}`;
+    if (!labels.includes(weightLabel)) {
+      labels.push(weightLabel);
+    }
+
+    await utils.ensureWeightLabel(this.githubApi, this.githubOwner, this.githubRepo, issue.weight);
+  }
+
+  /**
    * Uses the preview issue import API to set creation date on issues and comments.
    * Also it does not notify assignees.
    *
@@ -506,6 +559,11 @@ export class GithubHelper {
           true,
         );
 
+    // Enrich with GitLab metadata if enabled and not a placeholder
+    if (!issue.isPlaceholder) {
+      bodyConverted = this.enrichBodyWithMetadata(issue, bodyConverted);
+    }
+
     let props: IssueImport = {
       title: issue.title ? issue.title.trim() : '',
       body: bodyConverted,
@@ -522,6 +580,11 @@ export class GithubHelper {
     props.assignee = assignees.length == 1 ? assignees[0] : undefined;
     props.milestone = this.convertMilestone(issue);
     props.labels = this.convertLabels(issue);
+
+    // Add weight label if enabled and not a placeholder
+    if (!issue.isPlaceholder) {
+      await this.addWeightLabel(issue, props.labels);
+    }
 
     if (settings.dryRun) return Promise.resolve({ data: issue });
 

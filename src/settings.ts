@@ -18,6 +18,8 @@ export default interface Settings {
   conversion: {
     useLowerCaseLabels: boolean;
     addIssueInformation: boolean;
+    enrichGitLabMetadata: boolean;
+    createWeightLabels: boolean;
   };
   transfer: {
     description: boolean;
@@ -39,9 +41,6 @@ export default interface Settings {
   mergeRequests: {
     logFile: string;
     log: boolean;
-  };
-  commitMap?: {
-    [key: string]: string;
   };
   s3?: S3Settings;
   commitMap: {
