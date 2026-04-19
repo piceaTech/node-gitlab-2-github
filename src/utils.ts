@@ -92,7 +92,8 @@ export const migrateAttachments = async (
   s3: S3Settings | undefined,
   gitlabHelper: GitlabHelper
 ) => {
-  const regexp = /(!?)\[([^\]]+)\]\((\/uploads[^)]+)\)/g;
+  // Also matches optional GitLab-specific {width=... height=...} attributes after the link
+  const regexp = /(!?)\[([^\]]+)\]\((\/uploads[^)]+)\)(\{[^}]*\})?/g;
 
   // Maps link offset to a new name in S3
   const offsetToAttachment: {
