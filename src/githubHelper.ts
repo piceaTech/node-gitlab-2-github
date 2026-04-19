@@ -113,6 +113,17 @@ export class GithubHelper {
       }).catch(err => {
         console.error(`Failed to fetch organization members: ${err}`);
       });
+    } else {
+      githubApi.repos.listCollaborators({
+        owner: this.githubOwner,
+        repo: this.githubRepo,
+      }).then(collaborators => {
+        for (let collaborator of collaborators.data) {
+          this.members.add(collaborator.login);
+        }
+      }).catch(err => {
+        console.error(`Failed to fetch repository collaborators: ${err}`);
+      });
     }
   }
 
