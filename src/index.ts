@@ -321,8 +321,9 @@ async function transferMilestones(usePlaceholders: boolean) {
   let milestones: (GitLabMilestone | MilestoneImport)[] =
     await gitlabApi.ProjectMilestones.all(settings.gitlab.projectId);
 
-  // sort milestones in ascending order of when they were created (by id)
-  milestones = milestones.sort((a, b) => a.id - b.id);
+  // sort milestones in ascending order of their project-scoped id (iid),
+  // since the placeholder logic relies on iid ordering
+  milestones = milestones.sort((a, b) => a.iid - b.iid);
 
   // get a list of the current milestones in the new GitHub repo (likely to be empty)
   const githubMilestones = await githubHelper.getAllGithubMilestones();
