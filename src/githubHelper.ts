@@ -241,13 +241,16 @@ export class GithubHelper {
     try {
       await utils.sleep(this.delayInMs);
       // get an array of GitHub labels for the new repo
-      let result = await this.githubApi.issues.listLabelsForRepo({
-        owner: this.githubOwner,
-        repo: this.githubRepo,
-      });
-
-      // extract the label name and put into a new array
-      let labels = result.data.map(x => x.name);
+      const labels = await this.githubApi.paginate(
+        this.githubApi.issues.listLabelsForRepo,
+        {
+          owner: this.githubOwner,
+          repo: this.githubRepo,
+          per_page: 100,
+        },
+        // extract the label name and put into a new array
+        response => response.data.map(label => label.name)
+      );
 
       return labels;
     } catch (err) {
