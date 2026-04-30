@@ -39,6 +39,8 @@ export default {
   conversion: {
     useLowerCaseLabels: true,
     addIssueInformation: true,
+    enrichGitLabMetadata: true,
+    createWeightLabels: true,
   },
   transfer: {
     description: true,
