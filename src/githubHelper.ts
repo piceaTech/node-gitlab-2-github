@@ -1746,7 +1746,7 @@ export class GithubHelper {
       ref = head_sha;
     }
 
-    let lineRef = `Commented on [${ref}](${repoLink}/compare/${base_sha}..${head_sha}${slug})\n\n`;
+    let lineRef = `Commented on [${ref}](${repoLink}/compare/${base_sha}...${head_sha}${slug})\n\n`;
 
     if (position.line_range) {
       if (position.line_range.start.type === 'new') {
