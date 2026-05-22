@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/piceaTech/node-gitlab-2-github#readme",
   "dependencies": {
+    "@azure/storage-blob": "^12.29.1",
     "@gitbeaker/node": "^35.1.0",
     "@octokit/plugin-throttling": "^11.0.1",
     "@octokit/rest": "^21.1.1",
