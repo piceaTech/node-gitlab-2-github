@@ -729,11 +729,32 @@ export class GithubHelper {
     );
 
     let result = null;
+    let consecutivePollErrors = 0;
+    const maxPollRetries = 3;
     while (true) {
       await utils.sleep(this.delayInMs);
-      result = await this.githubApi.request(
-        `GET /repos/${settings.github.owner}/${settings.github.repo}/import/issues/${pending.data.id}`
-      );
+      try {
+        result = await this.githubApi.request(
+          `GET /repos/${settings.github.owner}/${settings.github.repo}/import/issues/${pending.data.id}`
+        );
+        consecutivePollErrors = 0;
+      } catch (err) {
+        // Retry transient status-read failures, never the already accepted POST.
+        // A failed POST is deliberately not retried: it may have been accepted
+        // by GitHub even if its response did not reach us.
+        const status = err.status || (err.response && err.response.status);
+        if (status < 500 || status > 599 || !status ||
+            consecutivePollErrors >= maxPollRetries) {
+          throw err;
+        }
+        consecutivePollErrors++;
+        console.log(
+          `\tRetrying status check for import ${pending.data.id} ` +
+          `(${consecutivePollErrors}/${maxPollRetries}) after HTTP ${status}.`
+        );
+        await utils.sleep(this.delayInMs * consecutivePollErrors);
+        continue;
+      }
       if (
         result.data.status === 'imported' ||
         result.data.status === 'failed'
